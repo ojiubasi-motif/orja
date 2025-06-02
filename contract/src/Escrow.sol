@@ -55,8 +55,8 @@ contract Escrow {
 
     modifier onlyOwner() {
         require(
-            msg.sender == ecommercePlatform,
-            "Only the ecommerce platform can call this function"
+            msg.sender == owner,
+            "Only the  deployer can call this function"
         );
         _;
     }
