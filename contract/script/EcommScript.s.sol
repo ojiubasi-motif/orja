@@ -19,7 +19,7 @@ contract EcommScript is Script {
 
     function run() public {
         setUp();
-        vm.startBroadcast(deployer);
+        vm.startBroadcast(deployerPrivateKey);
         escrow = new Escrow();
         ecomm = new Ecommerce(address(escrow));
         escrow.setEcommercePlatform(address(ecomm));
