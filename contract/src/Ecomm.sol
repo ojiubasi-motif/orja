@@ -71,15 +71,16 @@ contract Ecommerce {
     }
     // UserType userCategory;
 
-    mapping(uint256 => uint256[]) private cart; //userId to cart
-    mapping(uint256 => mapping(uint256 => int8)) private userToproductQtyInCart;
-    mapping(uint256 => mapping(uint256 => OrderItem[]))
+    mapping(uint256 _buyerId => OrderItem[] _products) private cart; //userId to cart
+    // mapping(uint256 _sellerId => mapping(uint256 _paymentRef => int8 _productQty)) private userToproductQtyInCart;
+    mapping(uint256 _sellerId => mapping(uint256 _paymentRef => OrderItem[] _allSellerProductsInCart))
         private _allSellerOrdersPerCart;
     // mapping(uint => uint) cartCheckoutTotal;
-    mapping(uint256 => int256) private _checkoutAmount;
+    mapping(uint256 _buyerId=> uint256 _amount) private _checkoutAmount;
 
-    constructor(address _escrowAddress) //  address _adminDaoAddress
-    {
+    constructor(
+        address _escrowAddress //  address _adminDaoAddress
+    ) {
         require(msg.sender != address(0), "invalid owner address");
         owner = msg.sender;
         require(
@@ -92,8 +93,9 @@ contract Ecommerce {
     }
 
     struct OrderItem {
+        uint256 sellerId;
         uint256 productId;
-        int8 qty;
+        uint8 qty;
         int256 unitPrice;
         OrderStatus orderStatus;
     }
@@ -155,7 +157,7 @@ contract Ecommerce {
     // }
 
     //    ====getters for private variables============
-    function userCheckoutAmount(uint256 _userId) public view returns (int256) {
+    function userCheckoutAmount(uint256 _userId) public view returns (uint256) {
         return _checkoutAmount[_userId];
     }
 
@@ -240,29 +242,40 @@ contract Ecommerce {
         _userData = userData;
     }
 
-    function getUsers(uint _start, uint _end) external view onlyOwner returns (User[] memory) {
+    function getUsers(
+        uint _start,
+        uint _end
+    ) external view onlyOwner returns (User[] memory) {
         // require(_start < _end, "Invalid range");
         require(_end < users.length, "End index out of bounds");
-        require(_start < _end && _end - _start <= 500, "Invalid range and/or range shouldn't be bigger than 500");
+        require(
+            _start < _end && _end - _start <= 500,
+            "Invalid range and/or range shouldn't be bigger than 500"
+        );
         User[] memory fetchedUsers = new User[](_end - _start);
 
-        for(uint i = 0; i < fetchedUsers.length; i++) {
+        for (uint i = 0; i < fetchedUsers.length; i++) {
             fetchedUsers[i] = users[i + _start];
         }
         // User[] memory users = new User[](_end - _start);
         return fetchedUsers;
     }
 
-    function getProducts(uint _start, uint _end) external view returns (Product[] memory) {
-        
+    function getProducts(
+        uint _start,
+        uint _end
+    ) external view returns (Product[] memory) {
         require(_end < products.length, "End index out of bounds");
-        require(_start < _end && _end - _start <= 500, "Invalid range and/or range shouldn't be bigger than 500");
+        require(
+            _start < _end && _end - _start <= 500,
+            "Invalid range and/or range shouldn't be bigger than 500"
+        );
         Product[] memory fetchedProducts = new Product[](_end - _start);
 
-        for(uint i = 0; i < fetchedProducts.length; i++) {
+        for (uint i = 0; i < fetchedProducts.length; i++) {
             fetchedProducts[i] = products[i + _start];
         }
-        
+
         return fetchedProducts;
     }
 
@@ -312,13 +325,20 @@ contract Ecommerce {
 
     function addProductToCart(
         uint256 _productId,
-        int8 _qty,
+        uint8 _qty,
         address _account
     ) public onlyAuthorizedBuyer(_account) {
         Product memory product = getProductData(_productId);
         User memory user = getUserData(_account);
-        cart[user.userId].push(product.productId);
-        userToproductQtyInCart[user.userId][product.productId] = _qty;
+        OrderItem memory item = OrderItem({
+            sellerId: product.sellerId,
+            productId: product.productId,
+            qty: _qty,
+            unitPrice: product.unitPrice,
+            orderStatus: OrderStatus.Processing
+        });
+        cart[user.userId].push(item);
+        // userToproductQtyInCart[user.userId][product.productId] = _qty;
     }
 
     function getUserData(address _account) public view returns (User memory) {
@@ -355,16 +375,18 @@ contract Ecommerce {
         address _userAcc
     ) private view returns (uint32 id) {
         // uint256 id;
-        id = uint32(uint256(
-            keccak256(
-                abi.encodePacked(
-                    _lastName,
-                    _firstName,
-                    _userAcc,
-                    block.timestamp
+        id = uint32(
+            uint256(
+                keccak256(
+                    abi.encodePacked(
+                        _lastName,
+                        _firstName,
+                        _userAcc,
+                        block.timestamp
+                    )
                 )
             )
-        ));
+        );
         // return id;
     }
 
@@ -373,26 +395,30 @@ contract Ecommerce {
         address _listedBy
     ) private view returns (uint64 id) {
         // uint256 id;
-        id = uint64(uint256(
-            keccak256(
-                abi.encodePacked(_productTitle, _listedBy, block.timestamp)
+        id = uint64(
+            uint256(
+                keccak256(
+                    abi.encodePacked(_productTitle, _listedBy, block.timestamp)
+                )
             )
-        ));
+        );
         // return id;
     }
 
     function _generatePaymentRefence(
         address _account
     ) private view returns (uint64 ref) {
-        ref = uint64(uint256(
-            keccak256(
-                abi.encodePacked(
-                    _account,
-                    block.timestamp,
-                    users[userIdToRecordIndex[_account]].userId
+        ref = uint64(
+            uint256(
+                keccak256(
+                    abi.encodePacked(
+                        _account,
+                        block.timestamp,
+                        users[userIdToRecordIndex[_account]].userId
+                    )
                 )
             )
-        ));
+        );
     }
 
     function _calculateProductPrice(
@@ -406,29 +432,35 @@ contract Ecommerce {
         address _account,
         string memory _paymentTokenSymbol
     ) private {
-        User memory userData= getUserData(_account);
-        uint256[] memory cartItems = cart[userData.userId];
-        int256 amountPayable;
+        User memory userData = getUserData(_account);
+        OrderItem[] memory cartItems = cart[userData.userId];
+        uint256 amountPayable;
         uint256 paymentRef = _generatePaymentRefence(_account);
-        Product memory product;
+        Product memory productData;
         // ✅ Predefine the length of memory array
         // OrderItem[] memory _sellerToOrders = new OrderItem[](cartItems.length);
 
         for (uint256 i = 0; i < cartItems.length; ++i) {
-            uint256 productId = cartItems[i];
-            product = getProductData(productId);
-            if(product.sellerId == 0) {
+            OrderItem memory item = cartItems[i];
+            // get the current product data
+            productData = getProductData(item.productId);
+            uint8 quantity = cartItems[i].qty;
+            if (productData.productId == 0) {
                 continue; // skip if product is not valid
             }
-            int8 quantity = userToproductQtyInCart[userData.userId][productId];
-            amountPayable += product.unitPrice * quantity;
+            if (productData.sellerId == 0) {
+                continue; // skip if product is not valid
+            }
+            // int8 quantity = userToproductQtyInCart[userData.userId][productId];
+            amountPayable += uint(productData.unitPrice) * quantity;
 
             // ✅ Use index-based assignment
-            _allSellerOrdersPerCart[product.sellerId][paymentRef].push(
+            _allSellerOrdersPerCart[productData.sellerId][paymentRef].push(
                 OrderItem({
-                    productId: product.productId,
+                    sellerId: productData.sellerId,
+                    productId: productData.productId,
                     qty: quantity,
-                    unitPrice: product.unitPrice,
+                    unitPrice: productData.unitPrice,
                     orderStatus: OrderStatus.Processing
                 })
             );
@@ -441,15 +473,24 @@ contract Ecommerce {
             priceFeed = AggregatorV3Interface(
                 0x694AA1769357215DE4FAC081bf1f309aDC325306
             );
-            (, /* uint80 roundId */ int256 answer, , , ) = /*uint256 startedAt*/ /*uint256 updatedAt*/ /*uint80 answeredInRound*/
-            priceFeed.latestRoundData();
-            int expectedEthValue = (_checkoutAmount[userData.userId] * 1e18) / answer;
+            (
+                ,
+                /* uint80 roundId */ int256 answer /*uint256 startedAt*/ /*uint256 updatedAt*/ /*uint80 answeredInRound*/,
+                ,
+                ,
+
+            ) = priceFeed.latestRoundData();
+            int expectedEthValue = (int(_checkoutAmount[userData.userId]) * 1e18) /
+                answer;
             require(
                 msg.value >= uint(expectedEthValue),
                 "insufficient amount of ETH"
             );
 
-            escrowInterface.payForItems{value: msg.value}(userData.userId, paymentRef);
+            escrowInterface.payForItems{value: msg.value}(
+                userData.userId,
+                paymentRef
+            );
         } else {
             // pay with stablecoins or other tokens...USDC USDT BUSD LINK
             require(

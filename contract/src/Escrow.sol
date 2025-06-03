@@ -37,10 +37,30 @@ contract Escrow {
             "Incorrect payment amount"
         );
         // Logic to handle payment
+        userBalance[_userId][_payRef] += msg.value;
         // For example, transfer funds to the seller
         // and emit an event for the transaction
         return true;
     }
+
+    function updateDeliveryStatus(
+        uint _userId,
+        uint _payRef,
+        bool _delivered
+    ) external onlyOwner {
+        // Logic to update delivery status
+        // This could involve updating a mapping or emitting an event
+        // For simplicity, we will just log the delivery status
+        if (_delivered) {
+            emit DeliveryConfirmed(_userId, _payRef);
+        } else {
+            emit DeliveryPending(_userId, _payRef);
+        }
+    }
+    
+    event DeliveryConfirmed(uint indexed userId, uint indexed payRef);
+    event DeliveryPending(uint indexed userId, uint indexed payRef);
+    event PaymentReceived(uint indexed userId, uint indexed payRef, uint amount);
 
     modifier isCorrectFundsSent(uint _userId, uint _payRef) {
         uint escrowBalBefore = address(this).balance;
