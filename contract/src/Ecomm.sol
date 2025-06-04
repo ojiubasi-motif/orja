@@ -72,6 +72,7 @@ contract Ecommerce {
     // UserType userCategory;
 
     mapping(uint256 _buyerId => OrderItem[] _products) private cart; //userId to cart
+    mapping(uint256 _buyerId => bool ) private isCartProcessed; //userId to cart processed status
     // mapping(uint256 _sellerId => mapping(uint256 _paymentRef => int8 _productQty)) private userToproductQtyInCart;
     mapping(uint256 _sellerId => mapping(uint256 _paymentRef => OrderItem[] _allSellerProductsInCart))
         private _allSellerOrdersPerCart;
@@ -95,9 +96,11 @@ contract Ecommerce {
     struct OrderItem {
         uint256 sellerId;
         uint256 productId;
-        uint8 qty;
+        uint32 qty;
         int256 unitPrice;
         OrderStatus orderStatus;
+        uint256 _proposedDeliveryTime; // in seconds
+        // uint256 _deliveryTime; // in seconds
     }
 
     // OrderItem[] private _allSellerOrdersPerCart;
@@ -126,6 +129,7 @@ contract Ecommerce {
         uint8[] productCategories;
         string title;
         ProductSpec features;
+        uint256 whenToExpectDelivery; // in seconds
     }
 
     struct Category {
@@ -261,6 +265,15 @@ contract Ecommerce {
         return fetchedUsers;
     }
 
+    function getCart(
+        address _account
+    ) external view onlyAuthorizedBuyer(_account) returns (OrderItem[] memory) {
+        User memory userData = getUserData(_account);
+        OrderItem[] memory cartItems = cart[userData.userId];
+        require(cartItems.length > 0, "Cart is empty");
+        return cartItems;
+    }
+
     function getProducts(
         uint _start,
         uint _end
@@ -291,7 +304,8 @@ contract Ecommerce {
         string calldata _title,
         ProductSpec calldata _spec,
         uint256 _waranteeDuration,
-        uint8[] calldata _categories
+        uint8[] calldata _categories,
+        uint256 _expectedDeliveryTime
     ) external onlyAuthorizedSellerAccount(msg.sender) {
         User memory sellerData = getUserData(_seller);
         uint256 id = _generateProductId(_title, msg.sender);
@@ -302,7 +316,8 @@ contract Ecommerce {
             waranteeDuration: _waranteeDuration,
             title: _title,
             features: _spec,
-            productCategories: _categories
+            productCategories: _categories,
+            whenToExpectDelivery: block.timestamp + _expectedDeliveryTime 
         });
         products.push(newProductData);
         productIdToRecordIndex[id] = products.length - 1;
@@ -325,17 +340,20 @@ contract Ecommerce {
 
     function addProductToCart(
         uint256 _productId,
-        uint8 _qty,
+        uint32 _qty,
         address _account
     ) public onlyAuthorizedBuyer(_account) {
+        
         Product memory product = getProductData(_productId);
         User memory user = getUserData(_account);
+        require(!isCartProcessed[user.userId], "Cart already being processed, u can't add more items");
         OrderItem memory item = OrderItem({
             sellerId: product.sellerId,
             productId: product.productId,
             qty: _qty,
             unitPrice: product.unitPrice,
-            orderStatus: OrderStatus.Processing
+            orderStatus: OrderStatus.Processing,
+            _proposedDeliveryTime: product.whenToExpectDelivery // assuming delivery time is 7 days from now
         });
         cart[user.userId].push(item);
         // userToproductQtyInCart[user.userId][product.productId] = _qty;
@@ -365,6 +383,7 @@ contract Ecommerce {
         address _account,
         string memory _payToken
     ) public onlyAuthorizedBuyer(_account) {
+        
         _checkOut(_account, _payToken);
     }
 
@@ -433,6 +452,8 @@ contract Ecommerce {
         string memory _paymentTokenSymbol
     ) private {
         User memory userData = getUserData(_account);
+        isCartProcessed[userData.userId] = true; // mark the cart as processed
+
         OrderItem[] memory cartItems = cart[userData.userId];
         uint256 amountPayable;
         uint256 paymentRef = _generatePaymentRefence(_account);
@@ -444,7 +465,7 @@ contract Ecommerce {
             OrderItem memory item = cartItems[i];
             // get the current product data
             productData = getProductData(item.productId);
-            uint8 quantity = cartItems[i].qty;
+            uint32 quantity = cartItems[i].qty;
             if (productData.productId == 0) {
                 continue; // skip if product is not valid
             }
@@ -461,7 +482,8 @@ contract Ecommerce {
                     productId: productData.productId,
                     qty: quantity,
                     unitPrice: productData.unitPrice,
-                    orderStatus: OrderStatus.Processing
+                    orderStatus: OrderStatus.Processing,
+                    _proposedDeliveryTime: productData.whenToExpectDelivery
                 })
             );
         }
@@ -558,8 +580,8 @@ contract Ecommerce {
     modifier onlyAuthorizedBuyer(address _account) {
         User memory userData = getUserData(_account);
         require(
-            userData.account != address(0) && userData.account == msg.sender,
-            "unauthorized buyer"
+            (userData.account != address(0) && userData.account == msg.sender) || msg.sender == escrowContract,
+            "only the user or the escrow contract can call this function"
         );
         _;
     }

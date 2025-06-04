@@ -1,15 +1,24 @@
 // SPDX-License-Identifier: SEE LICENSE IN LICENSE
 pragma solidity ^0.8.0;
 
-import {IEcomm} from "../lib/interfaces/IEcomm.sol";
+import {IEcomm} from "@custom-interfaces/IEcomm.sol";
+import {OrderLib} from "@library/OrderManager.sol";
 
 contract Escrow {
     // 0x0f5C4Fdf728AAc8261FC17061c6dCFAb21D7bc62==verified
+    using OrderLib for OrderLib.UserType;
+    using OrderLib for OrderLib.VerificationStatus;
+    using OrderLib for OrderLib.User;
+    using OrderLib for OrderLib.OrderStatus;
+    using OrderLib for OrderLib.OrderItem;
+
     address public owner;
     address public ecommercePlatform;
     IEcomm ecommInterface;
     mapping(uint256 _userId => mapping(uint256 _paymentRef => uint256 _balance))
         public userBalance;
+    mapping (uint256 _userId => mapping(uint256 _paymentRef => uint256 _balance))
+        public withdrawableBalance;
 
     constructor() {
         owner = msg.sender;
@@ -18,7 +27,7 @@ contract Escrow {
 
     function setEcommercePlatform(
         address _ecommercePlatform
-    ) external onlyOwner {
+    ) external onlyContractOwner {
         require(
             _ecommercePlatform != address(0),
             "Invalid ecommerce platform address"
@@ -44,23 +53,70 @@ contract Escrow {
     }
 
     function updateDeliveryStatus(
-        uint _userId,
         uint _payRef,
+        uint _productId,
         bool _delivered
-    ) external onlyOwner {
+    ) external {
+        // !!!! define a library for enums...
+        IEcomm.User memory userData =ecommInterface.getUserAccount(
+            msg.sender
+        );
+        require(msg.sender == userData.account, "unathorized caller");
+        IEcomm.OrderItem[] memory allCartItems = ecommInterface.getCart(
+            userData.account
+        );
+        IEcomm.OrderItem memory cartItem;
         // Logic to update delivery status
-        // This could involve updating a mapping or emitting an event
-        // For simplicity, we will just log the delivery status
+        for (uint i = 0; i < allCartItems.length; i++) {
+            if (allCartItems[i].productId == _productId) {
+                if (
+                    allCartItems[i].orderStatus ==
+                    IEcomm.OrderStatus.Processing
+                ) {
+                    cartItem = allCartItems[i];
+                } else {
+                    revert(
+                        "Order already delivered or not in processing state"
+                    );
+                }
+
+                break;
+            } else if (
+                i == allCartItems.length - 1 &&
+                allCartItems[i].productId != _productId
+            ) {
+                revert("Product not found in cart");
+            }
+        }
+        // execute the delivery confirmation logic
         if (_delivered) {
-            emit DeliveryConfirmed(_userId, _payRef);
+            cartItem.orderStatus = IEcomm.OrderStatus.Delivered;
+            uint256 _bal = uint256(cartItem.unitPrice) *
+                cartItem.qty; // total amount for the item
+            userBalance[userData.userId][_payRef] -= _bal; // deduct it from the buyer balance
+            userBalance[cartItem.sellerId][_payRef] += _bal;//add it to the seller balance
+            withdrawableBalance[cartItem.sellerId][_payRef] += _bal; // add it to the seller withdrawable balance
+           
         } else {
-            emit DeliveryPending(_userId, _payRef);
+            // !!!buyer should not be eligible to withdraw  funds until settled
+            // !!add delivery duration to the order item in order to check if supposed delivery time is expired
+            if(cartItem._proposedDeliveryTime + 60 seconds > block.timestamp){
+                revert("Delivery time not yet expired, cannot withdraw funds");
+            }else{
+                withdrawableBalance[cartItem.sellerId][_payRef] +=
+                    userBalance[cartItem.sellerId][_payRef];
+            }
+            // emit DeliveryPending(_userId, _payRef);
         }
     }
-    
+
     event DeliveryConfirmed(uint indexed userId, uint indexed payRef);
     event DeliveryPending(uint indexed userId, uint indexed payRef);
-    event PaymentReceived(uint indexed userId, uint indexed payRef, uint amount);
+    event PaymentReceived(
+        uint indexed userId,
+        uint indexed payRef,
+        uint amount
+    );
 
     modifier isCorrectFundsSent(uint _userId, uint _payRef) {
         uint escrowBalBefore = address(this).balance;
@@ -74,11 +130,15 @@ contract Escrow {
         );
     }
 
-    modifier onlyOwner() {
+    modifier onlyContractOwner() {
         require(
             msg.sender == owner,
             "Only the  deployer can call this function"
         );
         _;
     }
+
+    // modifier onlyOwner(){
+    //     require
+    // }
 }

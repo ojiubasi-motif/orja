@@ -9,4 +9,5 @@ remappings = [
   "@chainlink/=lib/chainlink/contracts/src/v0.8/interfaces/",
   "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
   "@custom-interfaces/=lib/interfaces/",
+  "@library/=lib/library/",
 ]

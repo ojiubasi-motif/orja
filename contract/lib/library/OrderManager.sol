@@ -1,8 +1,20 @@
-// SPDX-License-Identifier: GPL-3.0
-pragma solidity >=0.8.26;
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
 
-interface IEcomm {
-    enum UserType {
+library OrderLib {
+    // enum Status {
+    //     Pending,
+    //     Shipped,
+    //     Delivered,
+    //     Cancelled
+    // }
+
+    // struct Order {
+    //     address buyer;
+    //     uint256 amount;
+    //     Status status;
+    // }
+     enum UserType {
         Buyer,
         Seller
     }
@@ -35,20 +47,8 @@ interface IEcomm {
         uint256 _proposedDeliveryTime; // in seconds
         // uint256 _deliveryTime; // in seconds
     }
-    // function cartCheckoutBill(uint _userId, uint _payRef) external;
-    function userCheckoutAmount(uint256 _userId) external view returns (uint256);
-    
-    function sellerOrdersPerCart(
-        uint _sellerId,
-        uint _paymentRef
-    ) external view returns (OrderItem[] memory orderItem);
 
-    function getUserAccount(
-        address _account
-    ) external view returns (User memory _userData);
-    
-    function getCart(
-        address _account
-    ) external view returns (OrderItem[] memory);
-
+    // function isDelivered(Order memory order) internal pure returns (bool) {
+    //     return order.status == Status.Delivered;
+    // }
 }
