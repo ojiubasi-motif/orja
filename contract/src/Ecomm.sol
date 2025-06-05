@@ -251,12 +251,12 @@ contract Ecommerce {
         uint _end
     ) external view onlyOwner returns (User[] memory) {
         // require(_start < _end, "Invalid range");
-        require(_end < users.length, "End index out of bounds");
+        require(_end <= users.length, "End index out of bounds");
         require(
-            _start < _end && _end - _start <= 500,
+            _start <= _end && _end - _start <= 500,
             "Invalid range and/or range shouldn't be bigger than 500"
         );
-        User[] memory fetchedUsers = new User[](_end - _start);
+        User[] memory fetchedUsers = new User[](_start == _end ? 1 : _end - _start);
 
         for (uint i = 0; i < fetchedUsers.length; i++) {
             fetchedUsers[i] = users[i + _start];
@@ -280,10 +280,10 @@ contract Ecommerce {
     ) external view returns (Product[] memory) {
         require(_end <= products.length, "End index out of bounds");
         require(
-            _start < _end && _end - _start <= 500,
+            _start <= _end && _end - _start <= 500,
             "Invalid range and/or range shouldn't be bigger than 500"
         );
-        Product[] memory fetchedProducts = new Product[](_end - _start);
+        Product[] memory fetchedProducts = new Product[](_start == _end ? 1 : _end - _start);
 
         for (uint i = 0; i < fetchedProducts.length; i++) {
             fetchedProducts[i] = products[i + _start];
