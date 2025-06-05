@@ -278,7 +278,7 @@ contract Ecommerce {
         uint _start,
         uint _end
     ) external view returns (Product[] memory) {
-        require(_end < products.length, "End index out of bounds");
+        require(_end <= products.length, "End index out of bounds");
         require(
             _start < _end && _end - _start <= 500,
             "Invalid range and/or range shouldn't be bigger than 500"
@@ -382,8 +382,7 @@ contract Ecommerce {
     function checkOut(
         address _account,
         string memory _payToken
-    ) public onlyAuthorizedBuyer(_account) {
-        
+    ) public payable onlyAuthorizedBuyer(_account) {  
         _checkOut(_account, _payToken);
     }
 
@@ -452,9 +451,12 @@ contract Ecommerce {
         string memory _paymentTokenSymbol
     ) private {
         User memory userData = getUserData(_account);
+        OrderItem[] memory cartItems = cart[userData.userId];
+        require(cartItems.length > 0, "Cart is empty for this user, add items to cart first");
+
+        require(isCartProcessed[userData.userId] == false, "Cart already processed, u can't checkout again");
         isCartProcessed[userData.userId] = true; // mark the cart as processed
 
-        OrderItem[] memory cartItems = cart[userData.userId];
         uint256 amountPayable;
         uint256 paymentRef = _generatePaymentRefence(_account);
         Product memory productData;
@@ -476,20 +478,20 @@ contract Ecommerce {
             amountPayable += uint(productData.unitPrice) * quantity;
 
             // ✅ Use index-based assignment
-            _allSellerOrdersPerCart[productData.sellerId][paymentRef].push(
-                OrderItem({
-                    sellerId: productData.sellerId,
-                    productId: productData.productId,
-                    qty: quantity,
-                    unitPrice: productData.unitPrice,
-                    orderStatus: OrderStatus.Processing,
-                    _proposedDeliveryTime: productData.whenToExpectDelivery
-                })
-            );
+            // _allSellerOrdersPerCart[productData.sellerId][paymentRef].push(
+            //     OrderItem({
+            //         sellerId: productData.sellerId,
+            //         productId: productData.productId,
+            //         qty: quantity,
+            //         unitPrice: productData.unitPrice,
+            //         orderStatus: OrderStatus.Processing,
+            //         _proposedDeliveryTime: productData.whenToExpectDelivery
+            //     })
+            // );
         }
         //  = _sellerToOrders;
         _checkoutAmount[userData.userId] = amountPayable;
-        if (msg.value > 0) {
+        if (keccak256(bytes(_paymentTokenSymbol)) == keccak256(bytes("ETH"))) {
             // pay with native currency(ETH)
             // ==let's check the latest eth price in USD...
             priceFeed = AggregatorV3Interface(

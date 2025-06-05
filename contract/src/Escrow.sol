@@ -17,7 +17,7 @@ contract Escrow {
     IEcomm ecommInterface;
     mapping(uint256 _userId => mapping(uint256 _paymentRef => uint256 _balance))
         public userBalance;
-    mapping (uint256 _userId => mapping(uint256 _paymentRef => uint256 _balance))
+    mapping(uint256 _userId => mapping(uint256 _paymentRef => uint256 _balance))
         public withdrawableBalance;
 
     constructor() {
@@ -40,10 +40,18 @@ contract Escrow {
         uint _payRef,
         uint _userId
     ) external payable isCorrectFundsSent(_userId, _payRef) returns (bool) {
+        require(
+            msg.sender == ecommercePlatform,
+            "only ecommerce contract can interract with this function"
+        );
         require(msg.value > 0, "Payment must be greater than zero");
         require(
             msg.value == ecommInterface.userCheckoutAmount(_userId),
             "Incorrect payment amount"
+        );
+        require(
+            userBalance[_userId][_payRef] == 0,
+            "Payment has already been made with this reference"
         );
         // Logic to handle payment
         userBalance[_userId][_payRef] += msg.value;
@@ -57,21 +65,31 @@ contract Escrow {
         uint _productId,
         bool _delivered
     ) external {
+        _updateDeliveryStatus(_payRef, _productId, _delivered);
+    }
+
+    function _updateDeliveryStatus(
+        uint _payRef,
+        uint _productId,
+        bool _delivered
+    ) internal {
         // !!!! define a library for enums...
-        IEcomm.User memory userData =ecommInterface.getUserAccount(
-            msg.sender
-        );
-        require(msg.sender == userData.account, "unathorized caller");
+        IEcomm.User memory buyer = ecommInterface.getUserAccount(msg.sender);
+        require(msg.sender == buyer.account, "unathorized caller");
         IEcomm.OrderItem[] memory allCartItems = ecommInterface.getCart(
-            userData.account
+            buyer.account
         );
+
         IEcomm.OrderItem memory cartItem;
         // Logic to update delivery status
         for (uint i = 0; i < allCartItems.length; i++) {
             if (allCartItems[i].productId == _productId) {
+                require(
+                    allCartItems[i].sellerId != buyer.userId,
+                    "malicious action detected, seller cannot confirm delivery of their own product"
+                );
                 if (
-                    allCartItems[i].orderStatus ==
-                    IEcomm.OrderStatus.Processing
+                    allCartItems[i].orderStatus == IEcomm.OrderStatus.Processing
                 ) {
                     cartItem = allCartItems[i];
                 } else {
@@ -88,23 +106,25 @@ contract Escrow {
                 revert("Product not found in cart");
             }
         }
+
+        uint256 _bal = uint256(cartItem.unitPrice) * cartItem.qty; // total amount for the item
         // execute the delivery confirmation logic
         if (_delivered) {
             cartItem.orderStatus = IEcomm.OrderStatus.Delivered;
-            uint256 _bal = uint256(cartItem.unitPrice) *
-                cartItem.qty; // total amount for the item
-            userBalance[userData.userId][_payRef] -= _bal; // deduct it from the buyer balance
-            userBalance[cartItem.sellerId][_payRef] += _bal;//add it to the seller balance
+
+            userBalance[buyer.userId][_payRef] -= _bal; // deduct it from the buyer balance
+            userBalance[cartItem.sellerId][_payRef] += _bal; //add it to the seller balance
             withdrawableBalance[cartItem.sellerId][_payRef] += _bal; // add it to the seller withdrawable balance
-           
         } else {
             // !!!buyer should not be eligible to withdraw  funds until settled
             // !!add delivery duration to the order item in order to check if supposed delivery time is expired
-            if(cartItem._proposedDeliveryTime + 60 seconds > block.timestamp){
-                revert("Delivery time not yet expired, cannot withdraw funds");
-            }else{
-                withdrawableBalance[cartItem.sellerId][_payRef] +=
-                    userBalance[cartItem.sellerId][_payRef];
+            if (cartItem._proposedDeliveryTime + 60 seconds > block.timestamp) {
+                revert(
+                    "Delivery time not yet expired, cannot withdraw funds yet"
+                );
+            } else {
+                userBalance[buyer.userId][_payRef] -= _bal; //remove from balance of the buyer
+                withdrawableBalance[buyer.userId][_payRef] += _bal; //add to buyer withdrawable balance
             }
             // emit DeliveryPending(_userId, _payRef);
         }
