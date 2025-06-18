@@ -39,7 +39,7 @@ contract Escrow {
     function payForItems(
         uint _payRef,
         uint _userId
-    ) external payable isCorrectFundsSent(_userId, _payRef) returns (bool) {
+    ) external payable isCorrectFundsSent(_userId, _payRef) returns (bool, uint) {
         require(
             msg.sender == ecommercePlatform,
             "only ecommerce contract can interract with this function"
@@ -57,7 +57,7 @@ contract Escrow {
         userBalance[_userId][_payRef] += msg.value;
         // For example, transfer funds to the seller
         // and emit an event for the transaction
-        return true;
+        return (true, _payRef);
     }
 
     function updateDeliveryStatus(

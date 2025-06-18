@@ -23,7 +23,7 @@ contract Ecommerce {
     event productpriceUpdate(
         uint256 indexed _productId,
         uint256 indexed _sellerId,
-        int256 _newPrice
+        uint256 _newPrice
     );
     event successfulCheckout(
         uint256 indexed _userId,
@@ -38,6 +38,7 @@ contract Ecommerce {
     //BTC=== 0x1b44F3514812d835EB1BDB0acB33d3fA3351Ee43
     // address adminDAOcontract;
     address payable escrowContract;
+    uint constant USD_DECIMALS = 1e8; // 8 decimals for USD
 
     struct TokenDetails {
         string symbol;
@@ -50,7 +51,7 @@ contract Ecommerce {
     mapping(address => bool) private isVerified; //is acc verified?
     mapping(address => uint256) private userIdToRecordIndex; //for easy fetching of user record from users array
     mapping(uint256 => uint256) productIdToRecordIndex;
-    mapping(address => bool) isAccepted;
+    mapping(string => bool) isAccepted;
     mapping(string => address) tokenSymbolToAddress;
 
     enum UserType {
@@ -72,12 +73,12 @@ contract Ecommerce {
     // UserType userCategory;
 
     mapping(uint256 _buyerId => OrderItem[] _products) private cart; //userId to cart
-    mapping(uint256 _buyerId => bool ) private isCartProcessed; //userId to cart processed status
+    mapping(uint256 _buyerId => bool) private isCartProcessed; //userId to cart processed status
     // mapping(uint256 _sellerId => mapping(uint256 _paymentRef => int8 _productQty)) private userToproductQtyInCart;
     mapping(uint256 _sellerId => mapping(uint256 _paymentRef => OrderItem[] _allSellerProductsInCart))
         private _allSellerOrdersPerCart;
     // mapping(uint => uint) cartCheckoutTotal;
-    mapping(uint256 _buyerId=> uint256 _amount) private _checkoutAmount;
+    mapping(uint256 _buyerId => uint256 _amount) private _checkoutAmount;
 
     constructor(
         address _escrowAddress //  address _adminDaoAddress
@@ -97,7 +98,7 @@ contract Ecommerce {
         uint256 sellerId;
         uint256 productId;
         uint32 qty;
-        int256 unitPrice;
+        uint256 unitPrice;
         OrderStatus orderStatus;
         uint256 _proposedDeliveryTime; // in seconds
         // uint256 _deliveryTime; // in seconds
@@ -124,11 +125,11 @@ contract Ecommerce {
     struct Product {
         uint256 productId;
         uint256 sellerId;
-        int256 unitPrice;
+        uint256 unitPrice;
         uint256 waranteeDuration;
-        uint8[] productCategories;
+        // uint8[] productCategories;
         string title;
-        ProductSpec features;
+        // ProductSpec features;
         uint256 whenToExpectDelivery; // in seconds
     }
 
@@ -138,21 +139,21 @@ contract Ecommerce {
         string title;
     }
 
-    Product[] products;
+    Product[] public products;
     User[] users;
 
     function addTokenToAcceptedList(
         address _tokenAddress,
         string memory _symbol
     ) external onlyOwner {
-        isAccepted[_tokenAddress] = true;
+        isAccepted[_symbol] = true;
         tokenSymbolToAddress[_symbol] = _tokenAddress;
 
         // acceptedTokens.push(TokenDetails(_symbol,_tokenAddress));
     }
 
-    function delistToken(address _tokenAddress) external onlyOwner {
-        isAccepted[_tokenAddress] = false;
+    function delistToken(string memory _symbol) external onlyOwner {
+        isAccepted[_symbol] = false;
     }
 
     //     function isTokenAccepted(address tokenAddr) public view returns (bool){
@@ -172,6 +173,12 @@ contract Ecommerce {
     // {
     //     return _sellerToOrder[_sellerId][_paymentRef];
     // }
+    // function scalePriceToUSD(
+    //     uint256 _priceInWei
+    // ) public pure returns (uint256) {
+    //     return _priceInWei * USD_DECIMALS;
+    // }
+
     function sellerOrdersPerCart(
         uint _sellerId,
         uint _paymentRef
@@ -230,6 +237,7 @@ contract Ecommerce {
     // }
     function verifySeller(address _account) external onlyOwner {
         User storage userData = users[userIdToRecordIndex[_account]];
+        require(userData.account == _account, "account mismatch");
         require(
             !isVerified[userData.account],
             "this seller is already Verified!"
@@ -239,12 +247,12 @@ contract Ecommerce {
         emit verifiedAuser(userData.userId);
     }
 
-    function getUserAccount(
-        address _account
-    ) public view returns (User memory _userData) {
-        User memory userData = users[userIdToRecordIndex[_account]];
-        _userData = userData;
-    }
+    // function getUserAccount(
+    //     address _account
+    // ) public view returns (User memory _userData) {
+    //     User memory userData = users[userIdToRecordIndex[_account]];
+    //     _userData = userData;
+    // }
 
     function getUsers(
         uint _start,
@@ -256,7 +264,9 @@ contract Ecommerce {
             _start <= _end && _end - _start <= 500,
             "Invalid range and/or range shouldn't be bigger than 500"
         );
-        User[] memory fetchedUsers = new User[](_start == _end ? 1 : _end - _start);
+        User[] memory fetchedUsers = new User[](
+            _start == _end ? 1 : _end - _start
+        );
 
         for (uint i = 0; i < fetchedUsers.length; i++) {
             fetchedUsers[i] = users[i + _start];
@@ -278,12 +288,14 @@ contract Ecommerce {
         uint _start,
         uint _end
     ) external view returns (Product[] memory) {
-        require(_end <= products.length, "End index out of bounds");
+        require(_end < products.length, "End index out of bounds");
         require(
             _start <= _end && _end - _start <= 500,
             "Invalid range and/or range shouldn't be bigger than 500"
         );
-        Product[] memory fetchedProducts = new Product[](_start == _end ? 1 : _end - _start);
+        Product[] memory fetchedProducts = new Product[](
+            _start == _end ? 1 : (_end - _start) + 1
+        );
 
         for (uint i = 0; i < fetchedProducts.length; i++) {
             fetchedProducts[i] = products[i + _start];
@@ -299,25 +311,25 @@ contract Ecommerce {
     // }
 
     function listProduct(
-        address _seller,
-        int256 _unitprice,
+        // address _seller,
+        uint256 _unitprice,
         string calldata _title,
-        ProductSpec calldata _spec,
+        // ProductSpec calldata _spec,
         uint256 _waranteeDuration,
-        uint8[] calldata _categories,
+        // uint8[] calldata _categories,
         uint256 _expectedDeliveryTime
     ) external onlyAuthorizedSellerAccount(msg.sender) {
-        User memory sellerData = getUserData(_seller);
+        User memory sellerData = getUserData(msg.sender);
         uint256 id = _generateProductId(_title, msg.sender);
         Product memory newProductData = Product({
             productId: id,
             sellerId: sellerData.userId,
-            unitPrice: _unitprice,
+            unitPrice: _unitprice * USD_DECIMALS, // scale to USD
             waranteeDuration: _waranteeDuration,
             title: _title,
-            features: _spec,
-            productCategories: _categories,
-            whenToExpectDelivery: block.timestamp + _expectedDeliveryTime 
+            // features: _spec,
+            // productCategories: _categories,
+            whenToExpectDelivery: block.timestamp + _expectedDeliveryTime
         });
         products.push(newProductData);
         productIdToRecordIndex[id] = products.length - 1;
@@ -327,26 +339,34 @@ contract Ecommerce {
     function updateProductPrice(
         address _account,
         uint256 _productId,
-        int256 _newPrice
+        uint256 _newPrice
     ) external onlyAuthorizedSellerAccount(_account) {
         Product storage productData = products[
             productIdToRecordIndex[_productId]
         ];
         User memory userData = getUserData(_account);
-        productData.unitPrice = _newPrice;
+        require(userData.userId == productData.sellerId, "Unauthorized seller");
+        require(productData.productId == _productId, "Product ID mismatch");
+        require(_newPrice > 0, "New price must be greater than zero");
+        productData.unitPrice = _newPrice * USD_DECIMALS; //uint256(uint(_newPrice)); //_newPrice;
         products[productIdToRecordIndex[_productId]] = productData;
         emit productpriceUpdate(_productId, userData.userId, _newPrice);
     }
 
     function addProductToCart(
         uint256 _productId,
-        uint32 _qty,
-        address _account
-    ) public onlyAuthorizedBuyer(_account) {
-        
+        uint32 _qty
+    )
+        public
+        // address _account
+        onlyAuthorizedBuyer(msg.sender)
+    {
         Product memory product = getProductData(_productId);
-        User memory user = getUserData(_account);
-        require(!isCartProcessed[user.userId], "Cart already being processed, u can't add more items");
+        User memory user = getUserData(msg.sender);
+        require(
+            !isCartProcessed[user.userId],
+            "Cart already being processed, u can't add more items"
+        );
         OrderItem memory item = OrderItem({
             sellerId: product.sellerId,
             productId: product.productId,
@@ -360,10 +380,11 @@ contract Ecommerce {
     }
 
     function getUserData(address _account) public view returns (User memory) {
+        require(isRegistered[_account], "account not registered");
         User memory userData = users[userIdToRecordIndex[_account]];
         require(
-            userData.account != address(0) && userData.account == msg.sender,
-            "Invalid user id"
+            userData.account != address(0) && userData.account == _account,
+            "Invalid user address or user not registered"
         );
         return userData;
     }
@@ -382,8 +403,13 @@ contract Ecommerce {
     function checkOut(
         address _account,
         string memory _payToken
-    ) public payable onlyAuthorizedBuyer(_account) {  
-        _checkOut(_account, _payToken);
+    )
+        public
+        payable
+        onlyAuthorizedBuyer(_account)
+        returns (bool _resp, uint _payref)
+    {
+        (_resp, _payref) = _checkOut(_account, _payToken);
     }
 
     // ======private and internal fns=============
@@ -439,22 +465,28 @@ contract Ecommerce {
         );
     }
 
-    function _calculateProductPrice(
-        uint256 _productId,
-        int8 _qty
-    ) internal view returns (int256) {
-        return getProductData(_productId).unitPrice * _qty;
-    }
+    // function _calculateProductPrice(
+    //     uint256 _productId,
+    //     uint8 _qty
+    // ) internal view returns (uint256) {
+    //     return getProductData(_productId).unitPrice * _qty;
+    // }
 
     function _checkOut(
         address _account,
         string memory _paymentTokenSymbol
-    ) private {
+    ) private returns (bool payResponse, uint payRef) {
         User memory userData = getUserData(_account);
         OrderItem[] memory cartItems = cart[userData.userId];
-        require(cartItems.length > 0, "Cart is empty for this user, add items to cart first");
+        require(
+            cartItems.length > 0,
+            "Cart is empty for this user, add items to cart first"
+        );
 
-        require(isCartProcessed[userData.userId] == false, "Cart already processed, u can't checkout again");
+        require(
+            isCartProcessed[userData.userId] == false,
+            "Cart already processed, u can't checkout again"
+        );
         isCartProcessed[userData.userId] = true; // mark the cart as processed
 
         uint256 amountPayable;
@@ -472,10 +504,10 @@ contract Ecommerce {
                 continue; // skip if product is not valid
             }
             if (productData.sellerId == 0) {
-                continue; // skip if product is not valid
+                continue; // skip if product seller is not valid
             }
             // int8 quantity = userToproductQtyInCart[userData.userId][productId];
-            amountPayable += uint(productData.unitPrice) * quantity;
+            amountPayable += productData.unitPrice * quantity;
 
             // ✅ Use index-based assignment
             // _allSellerOrdersPerCart[productData.sellerId][paymentRef].push(
@@ -494,27 +526,39 @@ contract Ecommerce {
         if (keccak256(bytes(_paymentTokenSymbol)) == keccak256(bytes("ETH"))) {
             // pay with native currency(ETH)
             // ==let's check the latest eth price in USD...
-            priceFeed = AggregatorV3Interface(
-                0x694AA1769357215DE4FAC081bf1f309aDC325306
-            );
-            (
-                ,
-                /* uint80 roundId */ int256 answer /*uint256 startedAt*/ /*uint256 updatedAt*/ /*uint80 answeredInRound*/,
-                ,
-                ,
+            // priceFeed = AggregatorV3Interface(
+            //     0x694AA1769357215DE4FAC081bf1f309aDC325306
+            // );
+            // (
+            //     ,
+            //     /* uint80 roundId */ int256 answer /*uint256 startedAt*/ /*uint256 updatedAt*/ /*uint80 answeredInRound*/,
+            //     ,
+            //     ,
 
-            ) = priceFeed.latestRoundData();
-            int expectedEthValue = (int(_checkoutAmount[userData.userId]) * 1e18) /
-                answer;
+            // ) = priceFeed.latestRoundData();
+            priceFeed = AggregatorV3Interface(
+                0x694AA1769357215DE4FAC081bf1f309aDC325306 //sepolia ETH priceFeed address
+            );
+
+            uint expectedEthValue = getUSDequivalence(
+                _checkoutAmount[userData.userId],
+                _paymentTokenSymbol
+            );
             require(
-                msg.value >= uint(expectedEthValue),
+                msg.value >= expectedEthValue,
                 "insufficient amount of ETH"
             );
 
-            escrowInterface.payForItems{value: msg.value}(
-                userData.userId,
-                paymentRef
+            _checkoutAmount[userData.userId] = 0;
+
+            (payResponse, payRef) = escrowInterface.payForItems{
+                value: msg.value
+            }(userData.userId, paymentRef);
+            require(
+                payResponse == true,
+                "payment via ETH failed, try again later"
             );
+            emit successfulCheckout(userData.userId, payRef);
         } else {
             // pay with stablecoins or other tokens...USDC USDT BUSD LINK
             require(
@@ -522,7 +566,7 @@ contract Ecommerce {
                 "please specify a valid token for payment"
             );
             require(
-                isAccepted[tokenSymbolToAddress[_paymentTokenSymbol]] == true,
+                isAccepted[_paymentTokenSymbol],
                 "sorry, the selected token is not accepted"
             );
             //====this is where u verify from chainlink the value of the token selected
@@ -542,9 +586,67 @@ contract Ecommerce {
             );
         }
 
-        _checkoutAmount[userData.userId] = 0;
+        // return (payResponse, payRef);
+    }
 
-        emit successfulCheckout(userData.userId, paymentRef);
+    function getUSDequivalence(
+        uint _totalBill,
+        string memory _paymentToken
+    ) public returns (uint256) {
+        require(
+            isAccepted[_paymentToken],
+            "the selected token is not accepted for payment"
+        );
+        require(
+            tokenSymbolToAddress[_paymentToken] != address(0),
+            "please specify a valid token for payment"
+        );
+        AggregatorV3Interface feed = AggregatorV3Interface(
+            tokenSymbolToAddress[_paymentToken] //priceFeed address
+        );
+        (
+            ,
+            /* uint80 roundId */ int256 tokenPrice /*uint256 startedAt*/ /*uint256 updatedAt*/ /*uint80 answeredInRound*/,
+            ,
+            ,
+
+        ) = feed.latestRoundData();
+        require(tokenPrice > 0, "Invalid price fetched from feed");
+        uint8 feedDecimals = feed.decimals();
+
+        (bool success, bytes memory _returned) = tokenSymbolToAddress[
+            _paymentToken
+        ].call(abi.encodeWithSignature("decimals()"));
+
+        uint8 tokenDecimals = abi.decode(_returned, (uint8));
+        require(
+            success && tokenDecimals > 0,
+            "Invalid token decimals fetched from token contract"
+        );
+
+        if (feedDecimals == USD_DECIMALS) {
+            return (_totalBill * tokenDecimals) / uint256(tokenPrice);
+        } else {
+            int256 scaledPrice = scalePrice(
+                tokenPrice,
+                feedDecimals
+            );
+            return (_totalBill * tokenDecimals) / uint256(scaledPrice);
+        }
+    }
+
+    function scalePrice(
+        int256 _price,
+        uint8 _priceDecimals
+    ) internal pure returns (int256) {
+        if (_priceDecimals < USD_DECIMALS) {
+            return
+                _price * int256(10 ** uint256(USD_DECIMALS - _priceDecimals));
+        } else if (_priceDecimals > USD_DECIMALS) {
+            return
+                _price / int256(10 ** uint256(_priceDecimals - USD_DECIMALS));
+        }
+        return _price;
     }
 
     // function compareStrings(string _input) public returns(bool){
@@ -582,7 +684,8 @@ contract Ecommerce {
     modifier onlyAuthorizedBuyer(address _account) {
         User memory userData = getUserData(_account);
         require(
-            (userData.account != address(0) && userData.account == msg.sender) || msg.sender == escrowContract,
+            (userData.account != address(0) &&
+                userData.account == msg.sender) || msg.sender == escrowContract,
             "only the user or the escrow contract can call this function"
         );
         _;
