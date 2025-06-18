@@ -11,8 +11,8 @@ contract EcommTest is Test {
     Ecommerce public orja;
     Escrow public escrow;
     address constant deployer = address(0x5E1A7C6f994cb18d331c72EAc68768c6e2965ac6);
-    address constant ecomAddr = address(0x8FBa65Dfa08911413Fb99eD193666EF75dCFA516);
-    address constant escrowAddr = address(0x2A4ceD814cEA64235daA9a7B7d2B20E434DEC255);
+    address constant ecomAddr = address(0x0a59c119d60FC1799c311FCf4ced848d59c390d2);
+    address constant escrowAddr = address(0x71E985F861Eb23caf27Ddced8AFed507B46ba6D3);
     address seller1;
     address buyer1;
 
