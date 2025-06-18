@@ -169,10 +169,6 @@ contract Ecommerce {
         });
     }
 
-    //     function isTokenAccepted(address tokenAddr) public view returns (bool){
-    //         return isAccepted[tokenAddr];
-    //     }
-    // }
 
     //    ====getters for private variables============
     function userCheckoutAmount(uint256 _userId) public view returns (uint256) {
@@ -232,13 +228,13 @@ contract Ecommerce {
         uint _end
     ) external view onlyOwner returns (User[] memory) {
         // require(_start < _end, "Invalid range");
-        require(_end <= users.length, "End index out of bounds");
+        require(_end < users.length, "End index out of bounds");
         require(
             _start <= _end && _end - _start <= 500,
             "Invalid range and/or range shouldn't be bigger than 500"
         );
         User[] memory fetchedUsers = new User[](
-            _start == _end ? 1 : _end - _start
+            _start == _end ? 1 : (_end - _start) + 1
         );
 
         for (uint i = 0; i < fetchedUsers.length; i++) {
@@ -475,10 +471,6 @@ contract Ecommerce {
         _checkoutAmount[userData.userId] = amountPayable;
         if (keccak256(bytes(_paymentTokenSymbol)) == keccak256(bytes("ETH"))) {
            
-            // priceFeed = AggregatorV3Interface(
-            //     0x694AA1769357215DE4FAC081bf1f309aDC325306 //sepolia ETH priceFeed address
-            // );
-
             uint expectedEthValue = getUSDequivalence(
                 _checkoutAmount[userData.userId],
                 "ETH"
@@ -518,6 +510,7 @@ contract Ecommerce {
                 _checkoutAmount[userData.userId],
                 _paymentTokenSymbol
             );
+             
             require(
                 totalValue > 0,
                 "the amount payable is zero, please check that your payment token is valid"
@@ -528,6 +521,7 @@ contract Ecommerce {
                     uint(_checkoutAmount[userData.userId]),
                 "insufficient balance of selected payment token, please topup"
             );
+            _checkoutAmount[userData.userId] = 0;
             erc20Interface.transferFrom(
                 msg.sender,
                 escrowContract,

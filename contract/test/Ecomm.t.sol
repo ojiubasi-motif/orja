@@ -86,7 +86,7 @@ contract EcommTest is Test {
         orja.addProductToCart(products[2].productId, 3);
 
         (bool resp, uint payref) =  orja.checkOut{
-            value: 7 ether
+            value:0.8 ether
         }(buyer1, "ETH");
         vm.stopPrank();
         // Ecommerce.Order[] memory orders = orja.getOrders(buyer1, 0, 5);
