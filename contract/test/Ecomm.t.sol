@@ -11,8 +11,8 @@ contract EcommTest is Test {
     Ecommerce public orja;
     Escrow public escrow;
     address constant deployer = address(0x5E1A7C6f994cb18d331c72EAc68768c6e2965ac6);
-    address constant ecomAddr = address(0xdC323Dc11d6a099342048D3153C38Ab8358D521D);
-    address constant escrowAddr = address(0xE7E1dD095BcC04c42f9D76E1c9Df906BA4D5Abc7);
+    address constant ecomAddr = address(0x8FBa65Dfa08911413Fb99eD193666EF75dCFA516);
+    address constant escrowAddr = address(0x2A4ceD814cEA64235daA9a7B7d2B20E434DEC255);
     address seller1;
     address buyer1;
 
@@ -59,9 +59,9 @@ contract EcommTest is Test {
         // Test product listing
         vm.startPrank(seller1);
         // vm.prank(seller1);
-        orja.listProduct(1 ether, "gucci pant", 300 days, 7 days);
-        orja.listProduct(0.1 ether, "louise vuitton", 14 days, 7 days);
-        orja.listProduct(0.001 ether, "prada", 3 days, 7 days);
+        orja.listProduct(50, "gucci pant", 300 days, 7 days);
+        orja.listProduct(350, "louise vuitton", 14 days, 7 days);
+        orja.listProduct(600, "prada", 3 days, 7 days);
         vm.stopPrank();
        
     }
@@ -71,7 +71,7 @@ contract EcommTest is Test {
         // Ecommerce.Product memory listedProduct = orja.getProductData(products[0].productId);
         console.log("number of Listed Products==>", products.length);
         console.log("name of Listed Products 4==>", products[4].title);
-        assertEq(products[2].unitPrice, 1 ether);
+        assertEq(products[2].unitPrice, 50);
         assertEq(products[3].title, "louise vuitton");
     }
 
@@ -86,7 +86,7 @@ contract EcommTest is Test {
         orja.addProductToCart(products[2].productId, 3);
 
         (bool resp, uint payref) =  orja.checkOut{
-            value:0.8 ether
+            value:1 ether
         }(buyer1, "ETH");
         vm.stopPrank();
         // Ecommerce.Order[] memory orders = orja.getOrders(buyer1, 0, 5);
