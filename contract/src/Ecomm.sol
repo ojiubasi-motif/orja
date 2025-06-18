@@ -52,7 +52,12 @@ contract Ecommerce {
     mapping(address => uint256) private userIdToRecordIndex; //for easy fetching of user record from users array
     mapping(uint256 => uint256) productIdToRecordIndex;
     mapping(string => bool) isAccepted;
-    mapping(string => address) tokenSymbolToAddress;
+    mapping(string => Token) tokenSymbolToDetails;
+
+    struct Token {
+        address feedAddr;
+        address tokenAddr;
+    }
 
     enum UserType {
         Buyer,
@@ -144,16 +149,24 @@ contract Ecommerce {
 
     function addTokenToAcceptedList(
         address _tokenAddress,
-        string memory _symbol
+        string memory _symbol,
+        address _feedAddress
     ) external onlyOwner {
         isAccepted[_symbol] = true;
-        tokenSymbolToAddress[_symbol] = _tokenAddress;
+        tokenSymbolToDetails[_symbol] = Token({
+            feedAddr: _feedAddress, // Set the feed address if needed
+            tokenAddr: _tokenAddress
+        });
 
         // acceptedTokens.push(TokenDetails(_symbol,_tokenAddress));
     }
 
     function delistToken(string memory _symbol) external onlyOwner {
         isAccepted[_symbol] = false;
+        tokenSymbolToDetails[_symbol] = Token({
+            feedAddr: address(0), // Set the feed address if needed
+            tokenAddr: address(0)
+        });
     }
 
     //     function isTokenAccepted(address tokenAddr) public view returns (bool){
@@ -165,19 +178,6 @@ contract Ecommerce {
     function userCheckoutAmount(uint256 _userId) public view returns (uint256) {
         return _checkoutAmount[_userId];
     }
-
-    // function sellerToOrder(uint256 _sellerId, uint256 _paymentRef)
-    //     public
-    //     view
-    //     returns (OrderItem memory orderItem)
-    // {
-    //     return _sellerToOrder[_sellerId][_paymentRef];
-    // }
-    // function scalePriceToUSD(
-    //     uint256 _priceInWei
-    // ) public pure returns (uint256) {
-    //     return _priceInWei * USD_DECIMALS;
-    // }
 
     function sellerOrdersPerCart(
         uint _sellerId,
@@ -213,28 +213,7 @@ contract Ecommerce {
         userIdToRecordIndex[msg.sender] = users.length - 1;
         emit resgisteredAuser(userId);
     }
-
-    // function changeAccountOwnership(uint256 _userId, address _newOwner)
-    //     external
-    // {
-    //     require(msg.sender != address(0), "Invalid address");
-    //     User memory userData = users[userIdToRecordIndex[_userId]];
-    //     require(
-    //         msg.sender == userData.account || msg.sender == adminDAOcontract,
-    //         "unauthorized address not allowed to change ownership"
-    //     );
-    //     // if(msg.sender == userData.account)
-    //     address oldOwnwer = userData.account;
-    //     // change the owner||||||
-    //     userData.account = _newOwner;
-    //     users[userIdToRecordIndex[_userId]] = userData;
-    //     emit accountOwnershipChanged(
-    //         _userId,
-    //         msg.sender,
-    //         oldOwnwer,
-    //         userData.account
-    //     );
-    // }
+    
     function verifySeller(address _account) external onlyOwner {
         User storage userData = users[userIdToRecordIndex[_account]];
         require(userData.account == _account, "account mismatch");
@@ -247,12 +226,6 @@ contract Ecommerce {
         emit verifiedAuser(userData.userId);
     }
 
-    // function getUserAccount(
-    //     address _account
-    // ) public view returns (User memory _userData) {
-    //     User memory userData = users[userIdToRecordIndex[_account]];
-    //     _userData = userData;
-    // }
 
     function getUsers(
         uint _start,
@@ -304,11 +277,7 @@ contract Ecommerce {
         return fetchedProducts;
     }
 
-    // function setAdminContractAddress(address _daoContract) external {
-    //     require(_daoContract != address(0), "Invalid Address");
-    //     adminDAOcontract = _daoContract;
-    //     //require(_daoContract.code.length > 0,"Invalid DAO Contract Address");
-    // }
+    
 
     function listProduct(
         // address _seller,
@@ -465,12 +434,6 @@ contract Ecommerce {
         );
     }
 
-    // function _calculateProductPrice(
-    //     uint256 _productId,
-    //     uint8 _qty
-    // ) internal view returns (uint256) {
-    //     return getProductData(_productId).unitPrice * _qty;
-    // }
 
     function _checkOut(
         address _account,
@@ -492,9 +455,7 @@ contract Ecommerce {
         uint256 amountPayable;
         uint256 paymentRef = _generatePaymentRefence(_account);
         Product memory productData;
-        // ✅ Predefine the length of memory array
-        // OrderItem[] memory _sellerToOrders = new OrderItem[](cartItems.length);
-
+        
         for (uint256 i = 0; i < cartItems.length; ++i) {
             OrderItem memory item = cartItems[i];
             // get the current product data
@@ -509,40 +470,18 @@ contract Ecommerce {
             // int8 quantity = userToproductQtyInCart[userData.userId][productId];
             amountPayable += productData.unitPrice * quantity;
 
-            // ✅ Use index-based assignment
-            // _allSellerOrdersPerCart[productData.sellerId][paymentRef].push(
-            //     OrderItem({
-            //         sellerId: productData.sellerId,
-            //         productId: productData.productId,
-            //         qty: quantity,
-            //         unitPrice: productData.unitPrice,
-            //         orderStatus: OrderStatus.Processing,
-            //         _proposedDeliveryTime: productData.whenToExpectDelivery
-            //     })
-            // );
         }
         //  = _sellerToOrders;
         _checkoutAmount[userData.userId] = amountPayable;
         if (keccak256(bytes(_paymentTokenSymbol)) == keccak256(bytes("ETH"))) {
-            // pay with native currency(ETH)
-            // ==let's check the latest eth price in USD...
+           
             // priceFeed = AggregatorV3Interface(
-            //     0x694AA1769357215DE4FAC081bf1f309aDC325306
+            //     0x694AA1769357215DE4FAC081bf1f309aDC325306 //sepolia ETH priceFeed address
             // );
-            // (
-            //     ,
-            //     /* uint80 roundId */ int256 answer /*uint256 startedAt*/ /*uint256 updatedAt*/ /*uint80 answeredInRound*/,
-            //     ,
-            //     ,
-
-            // ) = priceFeed.latestRoundData();
-            priceFeed = AggregatorV3Interface(
-                0x694AA1769357215DE4FAC081bf1f309aDC325306 //sepolia ETH priceFeed address
-            );
 
             uint expectedEthValue = getUSDequivalence(
                 _checkoutAmount[userData.userId],
-                _paymentTokenSymbol
+                "ETH"
             );
             require(
                 msg.value >= expectedEthValue,
@@ -561,28 +500,38 @@ contract Ecommerce {
             emit successfulCheckout(userData.userId, payRef);
         } else {
             // pay with stablecoins or other tokens...USDC USDT BUSD LINK
-            require(
-                tokenSymbolToAddress[_paymentTokenSymbol] != address(0),
-                "please specify a valid token for payment"
-            );
+            
             require(
                 isAccepted[_paymentTokenSymbol],
                 "sorry, the selected token is not accepted"
             );
+            require(
+                tokenSymbolToDetails[_paymentTokenSymbol].feedAddr != address(0) &&
+                tokenSymbolToDetails[_paymentTokenSymbol].tokenAddr != address(0),
+                "please specify a valid token for payment"
+            );
             //====this is where u verify from chainlink the value of the token selected
             //  and check if it's >= _checkoutAmount before you continue...===========
 
-            address tokenAddr = tokenSymbolToAddress[_paymentTokenSymbol];
-            erc20Interface = IERC20(tokenAddr);
+            // address tokenAddr = ;
+            uint totalValue = getUSDequivalence(
+                _checkoutAmount[userData.userId],
+                _paymentTokenSymbol
+            );
+            require(
+                totalValue > 0,
+                "the amount payable is zero, please check that your payment token is valid"
+            );
+            erc20Interface = IERC20(tokenSymbolToDetails[_paymentTokenSymbol].tokenAddr);
             require(
                 erc20Interface.balanceOf(msg.sender) >=
                     uint(_checkoutAmount[userData.userId]),
-                "you don't have enough of the token to pay for your order, please topup"
+                "insufficient balance of selected payment token, please topup"
             );
             erc20Interface.transferFrom(
                 msg.sender,
                 escrowContract,
-                uint(_checkoutAmount[userData.userId])
+                totalValue
             );
         }
 
@@ -598,29 +547,28 @@ contract Ecommerce {
             "the selected token is not accepted for payment"
         );
         require(
-            tokenSymbolToAddress[_paymentToken] != address(0),
+            tokenSymbolToDetails[_paymentToken].feedAddr != address(0),
             "please specify a valid token for payment"
         );
         AggregatorV3Interface feed = AggregatorV3Interface(
-            tokenSymbolToAddress[_paymentToken] //priceFeed address
+            tokenSymbolToDetails[_paymentToken].feedAddr //priceFeed address
         );
         (
             ,
             /* uint80 roundId */ int256 tokenPrice /*uint256 startedAt*/ /*uint256 updatedAt*/ /*uint80 answeredInRound*/,
             ,
             ,
-
         ) = feed.latestRoundData();
         require(tokenPrice > 0, "Invalid price fetched from feed");
         uint8 feedDecimals = feed.decimals();
 
-        (bool success, bytes memory _returned) = tokenSymbolToAddress[
+        (bool success, bytes memory _returned) = tokenSymbolToDetails[
             _paymentToken
-        ].call(abi.encodeWithSignature("decimals()"));
+        ].tokenAddr.call(abi.encodeWithSignature("decimals()"));
 
-        uint8 tokenDecimals = abi.decode(_returned, (uint8));
+        uint8 tokenDecimals = keccak256(bytes(_paymentToken)) == keccak256(bytes("ETH")) ? 18 : abi.decode(_returned, (uint8));
         require(
-            success && tokenDecimals > 0,
+            tokenDecimals > 0,
             "Invalid token decimals fetched from token contract"
         );
 
@@ -649,22 +597,6 @@ contract Ecommerce {
         return _price;
     }
 
-    // function compareStrings(string _input) public returns(bool){
-    //      return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));
-    // }
-    // =======escrow function============
-    // function _safeSendETH(uint256 _userId) internal {
-    //     require(
-    //         uint(_checkoutAmount[_userId]) <= msg.value,
-    //         "Insufficient funds sent"
-    //     );
-
-    //     (bool success, ) = escrowContract.call{
-    //         value: uint(_checkoutAmount[_userId])
-    //     }("");
-    //     _checkoutAmount[_userId] = 0;
-    //     require(success, "ETH transfer failed");
-    // }
 
     // =====modifiers=========
     modifier onlyAuthorizedSellerAccount(address _account) {
@@ -693,7 +625,7 @@ contract Ecommerce {
 
     modifier onlyOwner() {
         require(
-            msg.sender != address(0) && msg.sender == owner,
+             msg.sender == owner,
             "unauthorized owner"
         );
         _;
