@@ -36,7 +36,7 @@ interface IEcomm {
         // uint256 _deliveryTime; // in seconds
     }
     // function cartCheckoutBill(uint _userId, uint _payRef) external;
-    function userCheckoutAmount(uint256 _userId) external view returns (uint256);
+    function userCheckoutAmount(uint256 _payRef) external view returns (uint256);
     
     function sellerOrdersPerCart(
         uint _sellerId,

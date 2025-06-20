@@ -3,6 +3,9 @@ pragma solidity ^0.8.0;
 
 import {IEcomm} from "@custom-interfaces/IEcomm.sol";
 import {OrderLib} from "@library/OrderManager.sol";
+import "@chainlink/AggregatorV3Interface.sol";
+// import "forge-std/console.sol";
+
 
 contract Escrow {
     // 0x0f5C4Fdf728AAc8261FC17061c6dCFAb21D7bc62==verified
@@ -14,15 +17,18 @@ contract Escrow {
 
     address public owner;
     address public ecommercePlatform;
+    AggregatorV3Interface pricefeed;
+
     IEcomm ecommInterface;
     mapping(uint256 _userId => mapping(uint256 _paymentRef => uint256 _balance))
         public userBalance;
     mapping(uint256 _userId => mapping(uint256 _paymentRef => uint256 _balance))
         public withdrawableBalance;
 
-    constructor() {
+    constructor(address _feedAddr) {
         owner = msg.sender;
-        // Assuming the contract deployer is the ecommerce platform
+        pricefeed = AggregatorV3Interface(_feedAddr);//remove before deployment to production
+    
     }
 
     function setEcommercePlatform(
@@ -38,16 +44,41 @@ contract Escrow {
 
     function payForItems(
         uint _payRef,
+        uint bill,
         uint _userId
-    ) external payable isCorrectFundsSent(_userId, _payRef) returns (bool, uint) {
+    ) external payable  returns (bool, uint) {
+        // console.log(
+        //     "Paying for items with reference: %s, userId: %s",
+        //     _payRef,
+        //     _userId
+        // );
         require(
             msg.sender == ecommercePlatform,
             "only ecommerce contract can interract with this function"
         );
         require(msg.value > 0, "Payment must be greater than zero");
+
+        (
+            ,
+            /* uint80 roundId */ int256 tokenPrice /*uint256 startedAt*/ /*uint256 updatedAt*/ /*uint80 answeredInRound*/,
+            ,
+            ,
+
+        ) = pricefeed.latestRoundData();
+        require(tokenPrice > 0, "Invalid price fetched from feed");
+        uint valueInUsd = (msg.value * uint(tokenPrice)) / 1e18; // Assuming pricefeed returns price in 8 decimals
+        uint diff =  valueInUsd > bill ?
+             valueInUsd - bill :
+            bill - valueInUsd;
+        // console.log(
+        //     "Payment amount: %s, Checkout amount: %s, Difference: %s",
+        //     valueInUsd,
+        //     bill,
+        //     diff
+        // );
         require(
-            msg.value == ecommInterface.userCheckoutAmount(_userId),
-            "Incorrect payment amount"
+            diff <= 1e6, // 1e6 is 0.01USD in 8 decimals
+            "too much difference between payment and checkout amount, try again"
         );
         require(
             userBalance[_userId][_payRef] == 0,
@@ -138,14 +169,15 @@ contract Escrow {
         uint amount
     );
 
-    modifier isCorrectFundsSent(uint _userId, uint _payRef) {
+    modifier isCorrectFundsSent(uint _userId, uint _payRef, uint _amount) {
         uint escrowBalBefore = address(this).balance;
         uint userBalBefore = userBalance[_userId][_payRef]; // Assuming 0 is the payment reference for the user
         _;
         uint escrowBalAfter = address(this).balance;
         uint userBalAfter = userBalance[_userId][_payRef];
+        
         require(
-            escrowBalAfter == escrowBalBefore + userBalAfter,
+            userBalAfter - userBalBefore == _amount,
             "Incorrect funds sent to escrow"
         );
     }
@@ -161,4 +193,6 @@ contract Escrow {
     // modifier onlyOwner(){
     //     require
     // }
+     // needed to receive ETH
+    receive() external payable {}
 }

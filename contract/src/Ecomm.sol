@@ -4,6 +4,7 @@ pragma solidity >=0.8.26;
 import "@custom-interfaces/IEscrow.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@chainlink/AggregatorV3Interface.sol";
+// import "forge-std/console.sol";
 
 contract Ecommerce {
     // 0xDFAA030fFBeADF74ED00CED7cA3c1Af765E89f2b==verified
@@ -27,7 +28,8 @@ contract Ecommerce {
     );
     event successfulCheckout(
         uint256 indexed _userId,
-        uint256 indexed _paymentRefence
+        uint256 indexed _paymentRefence,
+        uint256 _amountPaid
     );
 
     address owner;
@@ -84,10 +86,12 @@ contract Ecommerce {
     mapping(uint256 _sellerId => mapping(uint256 _paymentRef => OrderItem[] _allSellerProductsInCart))
         private _allSellerOrdersPerCart;
     // mapping(uint => uint) cartCheckoutTotal;
-    mapping(uint256 _buyerId => uint256 _amount) private _checkoutAmount;
+    mapping(uint256 _paymentReference => uint256 _amount)
+        private _checkoutAmount;
 
     constructor(
-        address _escrowAddress //  address _adminDaoAddress
+        address _escrowAddress,
+        address _feddAddr //  address _adminDaoAddress
     ) {
         require(msg.sender != address(0), "invalid owner address");
         owner = msg.sender;
@@ -96,6 +100,7 @@ contract Ecommerce {
             "Invalid ESCROW address and/or unauthorized contract owner"
         );
         escrowContract = payable(_escrowAddress);
+        priceFeed = AggregatorV3Interface(_feddAddr);
         escrowInterface = IEcomEscrow(address(escrowContract));
         // adminDAOcontract = _adminDaoAddress;
     }
@@ -153,11 +158,20 @@ contract Ecommerce {
         string memory _symbol,
         address _feedAddress
     ) external onlyOwner {
-        isAccepted[_symbol] = true;
-        tokenSymbolToDetails[_symbol] = Token({
-            feedAddr: _feedAddress, // Set the feed address if needed
-            tokenAddr: _tokenAddress
-        });
+        if (keccak256(bytes(_symbol)) == keccak256(bytes("ETH"))) {
+            address ethAddr = address(uint160(uint256(keccak256("ETH")))); //calculate address to use for eth
+            isAccepted["ETH"] = true;
+            tokenSymbolToDetails["ETH"] = Token({
+                feedAddr: _feedAddress, // Set the feed address if needed
+                tokenAddr: ethAddr
+            });
+        } else {
+            isAccepted[_symbol] = true;
+            tokenSymbolToDetails[_symbol] = Token({
+                feedAddr: _feedAddress, // Set the feed address if needed
+                tokenAddr: _tokenAddress
+            });
+        }
 
         // acceptedTokens.push(TokenDetails(_symbol,_tokenAddress));
     }
@@ -171,8 +185,8 @@ contract Ecommerce {
     }
 
     //    ====getters for private variables============
-    function userCheckoutAmount(uint256 _userId) public view returns (uint256) {
-        return _checkoutAmount[_userId];
+    function userCheckoutAmount(uint256 _payRef) public view returns (uint256) {
+        return _checkoutAmount[_payRef];
     }
 
     function sellerOrdersPerCart(
@@ -338,7 +352,30 @@ contract Ecommerce {
             _proposedDeliveryTime: product.whenToExpectDelivery // assuming delivery time is 7 days from now
         });
         cart[user.userId].push(item);
+        calculateUserBill(user.userId); // calculate the total bill for the user
         // userToproductQtyInCart[user.userId][product.productId] = _qty;
+    }
+
+    function calculateUserBill(uint256 _userId) private returns (uint256) {
+        OrderItem[] memory cartItems = cart[_userId];
+        require(cartItems.length > 0, "Cart is empty for this user");
+        Product memory productData;
+
+        for (uint256 i = 0; i < cartItems.length; ++i) {
+            OrderItem memory item = cartItems[i];
+            // get the current product data
+            productData = getProductData(item.productId);
+            if (productData.productId == 0) {
+                continue; // skip if product is not valid
+            }
+            if (productData.sellerId == 0) {
+                continue; // skip if product seller is not valid
+            }
+            // int8 quantity = userToproductQtyInCart[userData.userId][productId];
+            _checkoutAmount[_userId] += (productData.unitPrice *
+                cartItems[i].qty);
+        }
+        return _checkoutAmount[_userId];
     }
 
     function getUserData(address _account) public view returns (User memory) {
@@ -371,6 +408,10 @@ contract Ecommerce {
         onlyAuthorizedBuyer(_account)
         returns (bool _resp, uint _payref)
     {
+        // isCartProcessed[
+        //     users[userIdToRecordIndex[_account]].userId
+        // ] = true; // set the cart processed status before checkout
+        // require(isCartProcessed[users[userIdToRecordIndex[_account]].userId] == false, "Cart already processed, u can't checkout again");
         (_resp, _payref) = _checkOut(_account, _payToken);
     }
 
@@ -432,61 +473,47 @@ contract Ecommerce {
         string memory _paymentTokenSymbol
     ) private returns (bool payResponse, uint payRef) {
         User memory userData = getUserData(_account);
-        OrderItem[] memory cartItems = cart[userData.userId];
-        require(
-            cartItems.length > 0,
-            "Cart is empty for this user, add items to cart first"
-        );
+        // OrderItem[] memory cartItems = cart[userData.userId];
+        // require(
+        //     cartItems.length > 0,
+        //     "Cart is empty for this user, add items to cart first"
+        // );
 
         require(
-            isCartProcessed[userData.userId] == false,
+            !isCartProcessed[userData.userId],
             "Cart already processed, u can't checkout again"
         );
         isCartProcessed[userData.userId] = true; // mark the cart as processed
 
-        uint256 amountPayable;
+        uint256 amountPayable = calculateUserBill(userData.userId);
         uint256 paymentRef = _generatePaymentRefence(_account);
-        Product memory productData;
 
-        for (uint256 i = 0; i < cartItems.length; ++i) {
-            OrderItem memory item = cartItems[i];
-            // get the current product data
-            productData = getProductData(item.productId);
-            uint32 quantity = cartItems[i].qty;
-            if (productData.productId == 0) {
-                continue; // skip if product is not valid
-            }
-            if (productData.sellerId == 0) {
-                continue; // skip if product seller is not valid
-            }
-            // int8 quantity = userToproductQtyInCart[userData.userId][productId];
-            amountPayable += productData.unitPrice * quantity;
-        }
-        //  = _sellerToOrders;
-        _checkoutAmount[userData.userId] = amountPayable;
+        // _checkoutAmount[paymentRef] = amountPayable;
         if (keccak256(bytes(_paymentTokenSymbol)) == keccak256(bytes("ETH"))) {
-            uint expectedEthValue = getUSDequivalence(
-                _checkoutAmount[userData.userId],
-                "ETH"
-            );
+            uint expectedEthValue = getUSDequivalence(amountPayable, "ETH");
+            // console.log(
+            //     "amount payable in USD for the items in cart==>",
+            //     _checkoutAmount[paymentRef]
+            // );
+            // console.log(
+            //     "expected eth value for the items in cart==>",
+            //     expectedEthValue
+            // );
             require(
                 msg.value >= expectedEthValue,
                 "insufficient amount of ETH"
             );
 
-            _checkoutAmount[userData.userId] = 0;
+            _checkoutAmount[paymentRef] = 0;
+            // amountPayable = 0; // reset the amount payable after checkout
 
             (payResponse, payRef) = escrowInterface.payForItems{
                 value: expectedEthValue
-            }(userData.userId, paymentRef);
-            require(
-                payResponse == true,
-                "payment via ETH failed, try again later"
-            );
-            emit successfulCheckout(userData.userId, payRef);
+            }(userData.userId, amountPayable, paymentRef);
+            // _checkoutAmount[paymentRef] = 0; // store the amount payable for this payment reference
+            require(payResponse, "payment via ETH failed, try again later");
+            emit successfulCheckout(userData.userId, payRef, amountPayable);
         } else {
-            // pay with stablecoins or other tokens...USDC USDT BUSD LINK
-
             require(
                 isAccepted[_paymentTokenSymbol],
                 "sorry, the selected token is not accepted"
@@ -498,15 +525,15 @@ contract Ecommerce {
                     address(0),
                 "please specify a valid token for payment"
             );
-            //====this is where u verify from chainlink the value of the token selected
-            //  and check if it's >= _checkoutAmount before you continue...===========
 
-            // address tokenAddr = ;
             uint totalValue = getUSDequivalence(
-                _checkoutAmount[userData.userId],
+                amountPayable,
                 _paymentTokenSymbol
             );
-
+            // console.log(
+            //     "total value to be paid in eth(or payment token) for the items in cart==>",
+            //     totalValue
+            // );
             require(
                 totalValue > 0,
                 "the amount payable is zero, please check that your payment token is valid"
@@ -516,14 +543,12 @@ contract Ecommerce {
             );
             require(
                 erc20Interface.balanceOf(msg.sender) >=
-                    uint(_checkoutAmount[userData.userId]),
+                    uint(_checkoutAmount[paymentRef]),
                 "insufficient balance of selected payment token, please topup"
             );
             _checkoutAmount[userData.userId] = 0;
             erc20Interface.transferFrom(msg.sender, escrowContract, totalValue);
         }
-
-        // return (payResponse, payRef);
     }
 
     function getUSDequivalence(
@@ -538,54 +563,62 @@ contract Ecommerce {
             tokenSymbolToDetails[_paymentToken].feedAddr != address(0),
             "please specify a valid token for payment"
         );
-        AggregatorV3Interface feed = AggregatorV3Interface(
-            tokenSymbolToDetails[_paymentToken].feedAddr //priceFeed address
-        );
+        // ======for contract test sake---
+        // AggregatorV3Interface feed = AggregatorV3Interface(
+        //     tokenSymbolToDetails[_paymentToken].feedAddr //priceFeed address
+        // );
         (
             ,
             /* uint80 roundId */ int256 tokenPrice /*uint256 startedAt*/ /*uint256 updatedAt*/ /*uint80 answeredInRound*/,
             ,
             ,
 
-        ) = feed.latestRoundData();
+        ) = priceFeed.latestRoundData();
         require(tokenPrice > 0, "Invalid price fetched from feed");
-        uint8 feedDecimals = feed.decimals();
-        uint8 tokenDecimals;
+        uint8 feedDecimals = priceFeed.decimals();
+
         if (keccak256(bytes(_paymentToken)) == keccak256(bytes("ETH"))) {
-            tokenDecimals = 18; // ETH price feed typically has 18 decimals
+            // tokenDecimals = 18; // ETH price feed typically has 18 decimals
+            int feedAnswer = feedDecimals == USD_PRECISION
+                ? tokenPrice
+                : scaleToPrecision(tokenPrice, feedDecimals, USD_PRECISION);
+
+            return (_totalBill * 1e18) / uint256(feedAnswer);
         } else {
+            uint tokenDecimals;
             (bool success, bytes memory _returned) = tokenSymbolToDetails[
                 _paymentToken
             ].tokenAddr.call(abi.encodeWithSignature("decimals()"));
+            uint8 decodedPrecision = abi.decode(_returned, (uint8));
+            require(
+                decodedPrecision > 0,
+                "Invalid token decimals fetched from token contract"
+            );
+            tokenDecimals = 10 ** decodedPrecision;
 
-            tokenDecimals = abi.decode(_returned, (uint8));
-        }
+            int feedAnswer = feedDecimals == USD_PRECISION
+                ? tokenPrice
+                : scaleToPrecision(tokenPrice, feedDecimals, USD_PRECISION);
 
-        require(
-            tokenDecimals > 0,
-            "Invalid token decimals fetched from token contract"
-        );
-
-        if (feedDecimals == USD_PRECISION) {
-            return (_totalBill * tokenDecimals) / uint256(tokenPrice);
-        } else {
-            int256 scaledPrice = scalePrice(tokenPrice, feedDecimals);
-            return (_totalBill * tokenDecimals) / uint256(scaledPrice);
+            return (_totalBill * tokenDecimals) / uint256(feedAnswer);
         }
     }
 
-    function scalePrice(
-        int256 _price,
-        uint8 _priceDecimals
+    function scaleToPrecision(
+        int256 _value,
+        uint8 _defaultDecimals,
+        uint8 _desiredDecimals
     ) internal pure returns (int256) {
-        if (_priceDecimals < USD_PRECISION) {
+        if (_defaultDecimals < _desiredDecimals) {
             return
-                _price * int256(10 ** uint256(USD_PRECISION - _priceDecimals));
-        } else if (_priceDecimals > USD_PRECISION) {
+                _value *
+                int256(10 ** uint256(_desiredDecimals - _defaultDecimals));
+        } else if (_defaultDecimals > _desiredDecimals) {
             return
-                _price / int256(10 ** uint256(_priceDecimals - USD_PRECISION));
+                _value /
+                int256(10 ** uint256(_defaultDecimals - _desiredDecimals));
         }
-        return _price;
+        return _value;
     }
 
     // =====modifiers=========

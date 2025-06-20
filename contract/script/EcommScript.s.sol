@@ -12,8 +12,10 @@ contract EcommScript is Script {
     address private deployer;
     address seller;
     // =============
-    address constant ecomAddr = address(0xb16D26703699433DD30a5a2132F0766Ebf74f8Fd);
-    address constant escrowAddr = address(0xe37262d65642CcE70323289fa93e213Db8d2e901);
+    // address  ecomAddr;
+    // //  = address(0xb16D26703699433DD30a5a2132F0766Ebf74f8Fd);
+    // address  escrowAddr;
+    //  = address(0xe37262d65642CcE70323289fa93e213Db8d2e901);
     // =============
     Ecommerce public ecomm;
     Escrow public escrow;
@@ -28,8 +30,8 @@ contract EcommScript is Script {
 
     function deployContracts() public returns (Ecommerce, Escrow) {
         vm.startBroadcast(deployerPrivateKey);
-        escrow = new Escrow();
-        ecomm = new Ecommerce(address(escrow));
+        escrow = new Escrow(address(0));
+        ecomm = new Ecommerce(address(escrow), address(0));///===change to price feed address if needed
         escrow.setEcommercePlatform(address(ecomm));
         ecomm.addTokenToAcceptedList(address(0),"ETH",address(0x694AA1769357215DE4FAC081bf1f309aDC325306));
         ecomm.addTokenToAcceptedList(address(0xfCF7129A8a69a2BD7f2f300eFc352342D6c1638b),"USDC",address(0xA2F78ab2355fe2f984D808B5CeE7FD0A93D5270E));
@@ -62,8 +64,8 @@ contract EcommScript is Script {
         setUp();
         (ecomm, escrow) = deployContracts();
         registerAndVerifySeller("Doe", "John");
-        listProduct("speaker", 500);
-        listProduct("Smartphone", 800);
+        // listProduct("speaker", 500);
+        // listProduct("Smartphone", 800);
         console.log("Ecommerce contract deployed at:", address(ecomm));
         console.log("Escrow contract deployed at:", address(escrow));
         console.log("Deployer address:", deployer);

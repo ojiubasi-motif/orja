@@ -5,16 +5,20 @@ import {Test} from "forge-std/Test.sol";
 import {Ecommerce} from "../src/Ecomm.sol";
 import {Escrow} from "../src/Escrow.sol";
 import "forge-std/console.sol";
+import {MockV3Aggregator} from "./Mocks.sol";
+
 // import {OrderLib} from "@library/OrderManager.sol";
 
 contract EcommTest is Test {
+    MockV3Aggregator public priceFeed;
     Ecommerce public orja;
     Escrow public escrow;
-    address constant deployer = address(0x5E1A7C6f994cb18d331c72EAc68768c6e2965ac6);
-    address constant ecomAddr = address(0x0a59c119d60FC1799c311FCf4ced848d59c390d2);
-    address constant escrowAddr = address(0x71E985F861Eb23caf27Ddced8AFed507B46ba6D3);
-    address seller1;
-    address buyer1;
+    // address constant deployer = address(0x5E1A7C6f994cb18d331c72EAc68768c6e2965ac6);
+    // address constant ecomAddr = address(0x0a59c119d60FC1799c311FCf4ced848d59c390d2);
+    // address constant escrowAddr = address(0x71E985F861Eb23caf27Ddced8AFed507B46ba6D3);
+    address seller1 = makeAddr("seller1");
+    address buyer1 = makeAddr("buyer1");
+    address deployer = makeAddr("deployer");
 
     function setUp() public {
         // counter = new Counter();
@@ -22,11 +26,30 @@ contract EcommTest is Test {
         vm.deal(deployer, 100 ether);
         vm.deal(seller1, 100 ether);
         vm.deal(buyer1, 100 ether);
-        // vm.createSelectFork("sepolia");
-        orja = Ecommerce(ecomAddr);
-        escrow = Escrow(escrowAddr);
-        seller1 = makeAddr("seller1");
-        buyer1 = makeAddr("buyer1");
+        vm.startPrank(deployer);
+        priceFeed = new MockV3Aggregator(8,2518e8);
+        escrow = new Escrow(address(priceFeed));
+        orja = new Ecommerce(address(escrow), address(priceFeed));
+        escrow.setEcommercePlatform(address(orja));
+        orja.addTokenToAcceptedList(
+            address(0),
+            "ETH",
+            address(0x694AA1769357215DE4FAC081bf1f309aDC325306)
+        );
+        orja.addTokenToAcceptedList(
+            address(0xfCF7129A8a69a2BD7f2f300eFc352342D6c1638b),
+            "USDC",
+            address(0xA2F78ab2355fe2f984D808B5CeE7FD0A93D5270E)
+        );
+        vm.stopPrank();
+
+        // ============== sepolia fork setup ==============
+        // Pass the escrow address as needed
+        // // vm.createSelectFork("sepolia");
+        // orja = Ecommerce(ecomAddr);
+        // escrow = Escrow(escrowAddr);
+        // seller1 = makeAddr("seller1");
+        // buyer1 = makeAddr("buyer1");
         // vm.prank(deployer);
         // escrow.setEcommercePlatform(ecomAddr);
     }
@@ -43,17 +66,20 @@ contract EcommTest is Test {
         vm.prank(deployer);
         orja.verifySeller(seller1);
         // vm.stopPrank();
-       
-
     }
+
     function testRegisterAndVerifySeller() public {
         registerAndVerifySeller();
         Ecommerce.User memory sellerData = orja.getUserData(seller1);
         console.log("registered seller id==>", sellerData.userId);
 
         assertEq(uint8(sellerData._userType), uint8(Ecommerce.UserType.Seller));
-        assertEq(uint8(sellerData.verificationStatus), uint8(Ecommerce.VerificationStatus.Verified));
+        assertEq(
+            uint8(sellerData.verificationStatus),
+            uint8(Ecommerce.VerificationStatus.Verified)
+        );
     }
+
     function listProduct() public {
         registerAndVerifySeller();
         // Test product listing
@@ -63,36 +89,38 @@ contract EcommTest is Test {
         orja.listProduct(350, "louise vuitton", 14 days, 7 days);
         orja.listProduct(600, "prada", 3 days, 7 days);
         vm.stopPrank();
-       
     }
+
     function testListProducts() public {
         listProduct();
-         Ecommerce.Product[] memory products = orja.getProducts(0,5);
+        Ecommerce.Product[] memory products = orja.getProducts(0, 2);
         // Ecommerce.Product memory listedProduct = orja.getProductData(products[0].productId);
         console.log("number of Listed Products==>", products.length);
-        console.log("name of Listed Products 4==>", products[4].title);
-        assertEq(products[2].unitPrice, 50);
-        assertEq(products[3].title, "louise vuitton");
+        console.log("name of Listed Products 4==>", products[2].title);
+        assertEq(products[1].unitPrice, 350);
+        assertEq(products[2].title, "prada");
     }
 
     function testBuyShopping() public {
         listProduct();
         // Test product purchase
-        vm.deal(buyer1, 100 ether);
+        // vm.deal(buyer1, 100 ether);
         vm.startPrank(buyer1);
         orja.register("Doe", "Jane", Ecommerce.UserType.Buyer);
-        Ecommerce.Product[] memory products = orja.getProducts(0,4);
-        orja.addProductToCart(products[3].productId, 2);
-        orja.addProductToCart(products[2].productId, 3);
+        Ecommerce.Product[] memory products = orja.getProducts(0, 2);
+        orja.addProductToCart(products[0].productId, 2);
+        orja.addProductToCart(products[1].productId, 6);
+        console.log("ecommercePlatform==>", escrow.ecommercePlatform());
 
-        (bool resp, uint payref) =  orja.checkOut{
-            value:1 ether
-        }(buyer1, "ETH");
+        (bool resp, uint payref) = orja.checkOut{value: 1 ether}(buyer1, "ETH");
         vm.stopPrank();
         // Ecommerce.Order[] memory orders = orja.getOrders(buyer1, 0, 5);
-        console.log("payref==>", payref);
+        // console.log("payref==>", payref);
         assertEq(resp, true);
+        // assertLeDecimal(actual, expected, 2);
         // assertEq(orders[1].productId, 2);
     }
 
+     // needed to receive ETH
+    receive() external payable {}
 }
