@@ -4,6 +4,7 @@ pragma solidity >=0.8.26;
 import "@custom-interfaces/IEscrow.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@chainlink/AggregatorV3Interface.sol";
+
 // import "forge-std/console.sol";
 
 contract Ecommerce {
@@ -55,7 +56,7 @@ contract Ecommerce {
     mapping(address => uint256) private userIdToRecordIndex; //for easy fetching of user record from users array
     mapping(uint256 => uint256) productIdToRecordIndex;
     mapping(string => bool) isAccepted;
-    mapping(string => Token) tokenSymbolToDetails;
+    mapping(string => Token) public tokenSymbolToDetails;
 
     struct Token {
         address feedAddr;
@@ -90,9 +91,9 @@ contract Ecommerce {
         private _checkoutAmount;
 
     constructor(
-        address _escrowAddress,
-        address _feddAddr //  address _adminDaoAddress
-    ) {
+        address _escrowAddress
+    ) // address _feddAddr //  address _adminDaoAddress
+    {
         require(msg.sender != address(0), "invalid owner address");
         owner = msg.sender;
         require(
@@ -100,7 +101,7 @@ contract Ecommerce {
             "Invalid ESCROW address and/or unauthorized contract owner"
         );
         escrowContract = payable(_escrowAddress);
-        priceFeed = AggregatorV3Interface(_feddAddr);
+        // priceFeed = AggregatorV3Interface(_feddAddr);
         escrowInterface = IEcomEscrow(address(escrowContract));
         // adminDAOcontract = _adminDaoAddress;
     }
@@ -352,7 +353,7 @@ contract Ecommerce {
             _proposedDeliveryTime: product.whenToExpectDelivery // assuming delivery time is 7 days from now
         });
         cart[user.userId].push(item);
-        calculateUserBill(user.userId); // calculate the total bill for the user
+        // calculateUserBill(user.userId); // calculate the total bill for the user
         // userToproductQtyInCart[user.userId][product.productId] = _qty;
     }
 
@@ -491,14 +492,7 @@ contract Ecommerce {
         // _checkoutAmount[paymentRef] = amountPayable;
         if (keccak256(bytes(_paymentTokenSymbol)) == keccak256(bytes("ETH"))) {
             uint expectedEthValue = getUSDequivalence(amountPayable, "ETH");
-            // console.log(
-            //     "amount payable in USD for the items in cart==>",
-            //     _checkoutAmount[paymentRef]
-            // );
-            // console.log(
-            //     "expected eth value for the items in cart==>",
-            //     expectedEthValue
-            // );
+
             require(
                 msg.value >= expectedEthValue,
                 "insufficient amount of ETH"
@@ -564,16 +558,16 @@ contract Ecommerce {
             "please specify a valid token for payment"
         );
         // ======for contract test sake---
-        // AggregatorV3Interface feed = AggregatorV3Interface(
-        //     tokenSymbolToDetails[_paymentToken].feedAddr //priceFeed address
-        // );
+        AggregatorV3Interface feed = AggregatorV3Interface(
+            tokenSymbolToDetails[_paymentToken].feedAddr //priceFeed address
+        );
         (
             ,
             /* uint80 roundId */ int256 tokenPrice /*uint256 startedAt*/ /*uint256 updatedAt*/ /*uint80 answeredInRound*/,
             ,
             ,
 
-        ) = priceFeed.latestRoundData();
+        ) = feed.latestRoundData();
         require(tokenPrice > 0, "Invalid price fetched from feed");
         uint8 feedDecimals = priceFeed.decimals();
 

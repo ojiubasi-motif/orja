@@ -25,9 +25,9 @@ contract Escrow {
     mapping(uint256 _userId => mapping(uint256 _paymentRef => uint256 _balance))
         public withdrawableBalance;
 
-    constructor(address _feedAddr) {
+    constructor() {
         owner = msg.sender;
-        pricefeed = AggregatorV3Interface(_feedAddr);//remove before deployment to production
+        // pricefeed = AggregatorV3Interface(_feedAddr);//remove before deployment to production
     
     }
 
@@ -57,7 +57,9 @@ contract Escrow {
             "only ecommerce contract can interract with this function"
         );
         require(msg.value > 0, "Payment must be greater than zero");
-
+         pricefeed = AggregatorV3Interface(
+            ecommInterface.tokenSymbolToDetails("ETH").feedAddr
+        );
         (
             ,
             /* uint80 roundId */ int256 tokenPrice /*uint256 startedAt*/ /*uint256 updatedAt*/ /*uint80 answeredInRound*/,
@@ -70,12 +72,7 @@ contract Escrow {
         uint diff =  valueInUsd > bill ?
              valueInUsd - bill :
             bill - valueInUsd;
-        // console.log(
-        //     "Payment amount: %s, Checkout amount: %s, Difference: %s",
-        //     valueInUsd,
-        //     bill,
-        //     diff
-        // );
+       
         require(
             diff <= 1e6, // 1e6 is 0.01USD in 8 decimals
             "too much difference between payment and checkout amount, try again"

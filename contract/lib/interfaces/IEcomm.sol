@@ -2,6 +2,10 @@
 pragma solidity >=0.8.26;
 
 interface IEcomm {
+    struct Token {
+        address feedAddr;
+        address tokenAddr;
+    }
     enum UserType {
         Buyer,
         Seller
@@ -50,5 +54,8 @@ interface IEcomm {
     function getCart(
         address _account
     ) external view returns (OrderItem[] memory);
-
+    
+    function tokenSymbolToDetails(
+        string memory _symbol
+    ) external view returns (Token memory tokenDetails);
 }
