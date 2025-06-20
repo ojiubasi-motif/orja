@@ -13,45 +13,45 @@ contract EcommTest is Test {
     MockV3Aggregator public priceFeed;
     Ecommerce public orja;
     Escrow public escrow;
-    // address constant deployer = address(0x5E1A7C6f994cb18d331c72EAc68768c6e2965ac6);
-    // address constant ecomAddr = address(0x0a59c119d60FC1799c311FCf4ced848d59c390d2);
-    // address constant escrowAddr = address(0x71E985F861Eb23caf27Ddced8AFed507B46ba6D3);
-    address seller1 = makeAddr("seller1");
-    address buyer1 = makeAddr("buyer1");
-    address deployer = makeAddr("deployer");
+    address constant deployer = address(0x5E1A7C6f994cb18d331c72EAc68768c6e2965ac6);
+    address constant ecomAddr = address(0x5E3d3cc318Bd4A760Fb24fF7C851aFeF06CE2E25);
+    address constant escrowAddr = address(0x61e7772709496451501DCd30a3D2422aA2Fdcb35);
+    address seller1 ;
+    address buyer1 ;
+    // address deployer = makeAddr("deployer");
 
     function setUp() public {
-        // counter = new Counter();
-        // counter.setNumber(0);
+        
         vm.deal(deployer, 100 ether);
         vm.deal(seller1, 100 ether);
         vm.deal(buyer1, 100 ether);
         vm.startPrank(deployer);
-        priceFeed = new MockV3Aggregator(8,2518e8);
-        escrow = new Escrow(address(priceFeed));
-        orja = new Ecommerce(address(escrow), address(priceFeed));
+        // priceFeed = new MockV3Aggregator(8,2518e8);
+        escrow = new Escrow();
+        orja = new Ecommerce(address(escrow));
         escrow.setEcommercePlatform(address(orja));
-        orja.addTokenToAcceptedList(
-            address(0),
-            "ETH",
-            address(0x694AA1769357215DE4FAC081bf1f309aDC325306)
-        );
-        orja.addTokenToAcceptedList(
-            address(0xfCF7129A8a69a2BD7f2f300eFc352342D6c1638b),
-            "USDC",
-            address(0xA2F78ab2355fe2f984D808B5CeE7FD0A93D5270E)
-        );
-        vm.stopPrank();
+        // orja.addTokenToAcceptedList(
+        //     address(0),
+        //     "ETH",
+        //     address(0x694AA1769357215DE4FAC081bf1f309aDC325306)
+        // );
+        // orja.addTokenToAcceptedList(
+        //     address(0xfCF7129A8a69a2BD7f2f300eFc352342D6c1638b),
+        //     "USDC",
+        //     address(0xA2F78ab2355fe2f984D808B5CeE7FD0A93D5270E)
+        // );
+        
 
         // ============== sepolia fork setup ==============
         // Pass the escrow address as needed
         // // vm.createSelectFork("sepolia");
-        // orja = Ecommerce(ecomAddr);
-        // escrow = Escrow(escrowAddr);
-        // seller1 = makeAddr("seller1");
-        // buyer1 = makeAddr("buyer1");
+        orja = Ecommerce(ecomAddr);
+        escrow = Escrow(payable (escrowAddr));
+        seller1 = makeAddr("seller1");
+        buyer1 = makeAddr("buyer1");
         // vm.prank(deployer);
-        // escrow.setEcommercePlatform(ecomAddr);
+        escrow.setEcommercePlatform(ecomAddr);
+        vm.stopPrank();
     }
 
     function registerAndVerifySeller() public {
@@ -104,7 +104,7 @@ contract EcommTest is Test {
     function testBuyShopping() public {
         listProduct();
         // Test product purchase
-        // vm.deal(buyer1, 100 ether);
+        vm.deal(buyer1, 10 ether);
         vm.startPrank(buyer1);
         orja.register("Doe", "Jane", Ecommerce.UserType.Buyer);
         Ecommerce.Product[] memory products = orja.getProducts(0, 2);
@@ -112,7 +112,7 @@ contract EcommTest is Test {
         orja.addProductToCart(products[1].productId, 6);
         console.log("ecommercePlatform==>", escrow.ecommercePlatform());
 
-        (bool resp, uint payref) = orja.checkOut{value: 1 ether}(buyer1, "ETH");
+        (bool resp, uint payref) = orja.checkOut{value: 2 ether}(buyer1, "ETH");
         vm.stopPrank();
         // Ecommerce.Order[] memory orders = orja.getOrders(buyer1, 0, 5);
         // console.log("payref==>", payref);

@@ -569,7 +569,7 @@ contract Ecommerce {
 
         ) = feed.latestRoundData();
         require(tokenPrice > 0, "Invalid price fetched from feed");
-        uint8 feedDecimals = priceFeed.decimals();
+        uint8 feedDecimals = feed.decimals();
 
         if (keccak256(bytes(_paymentToken)) == keccak256(bytes("ETH"))) {
             // tokenDecimals = 18; // ETH price feed typically has 18 decimals

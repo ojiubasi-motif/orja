@@ -30,8 +30,8 @@ contract EcommScript is Script {
 
     function deployContracts() public returns (Ecommerce, Escrow) {
         vm.startBroadcast(deployerPrivateKey);
-        escrow = new Escrow(address(0));
-        ecomm = new Ecommerce(address(escrow), address(0));///===change to price feed address if needed
+        escrow = new Escrow();
+        ecomm = new Ecommerce(address(escrow));///===change to price feed address if needed
         escrow.setEcommercePlatform(address(ecomm));
         ecomm.addTokenToAcceptedList(address(0),"ETH",address(0x694AA1769357215DE4FAC081bf1f309aDC325306));
         ecomm.addTokenToAcceptedList(address(0xfCF7129A8a69a2BD7f2f300eFc352342D6c1638b),"USDC",address(0xA2F78ab2355fe2f984D808B5CeE7FD0A93D5270E));
