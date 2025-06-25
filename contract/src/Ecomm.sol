@@ -2,12 +2,15 @@
 pragma solidity >=0.8.26;
 
 import "@custom-interfaces/IEscrow.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts-default/token/ERC20/IERC20.sol";
+import "openzeppelin-contracts-upgradeable/contracts/access/OwnableUpgradeable.sol";
+import "openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
+import "openzeppelin-contracts-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "@chainlink/AggregatorV3Interface.sol";
 
 // import "forge-std/console.sol";
 
-contract Ecommerce {
+contract Ecommerce is Initializable, OwnableUpgradeable, UUPSUpgradeable{
     // 0xDFAA030fFBeADF74ED00CED7cA3c1Af765E89f2b==verified
     // events
     event resgisteredAuser(uint256 indexed _userId);
@@ -33,7 +36,7 @@ contract Ecommerce {
         uint256 _amountPaid
     );
 
-    address owner;
+    // address owner;
     IEcomEscrow escrowInterface;
     IERC20 erc20Interface;
     AggregatorV3Interface internal priceFeed;
@@ -91,20 +94,38 @@ contract Ecommerce {
         private _checkoutAmount;
 
     constructor(
-        address _escrowAddress
+        // address _escrowAddress
     ) // address _feddAddr //  address _adminDaoAddress
     {
-        require(msg.sender != address(0), "invalid owner address");
-        owner = msg.sender;
-        require(
-            _escrowAddress != address(0) && msg.sender == owner,
-            "Invalid ESCROW address and/or unauthorized contract owner"
-        );
-        escrowContract = payable(_escrowAddress);
-        // priceFeed = AggregatorV3Interface(_feddAddr);
-        escrowInterface = IEcomEscrow(address(escrowContract));
+        _disableInitializers();
+        // require(msg.sender != address(0), "invalid owner address");
+        // owner = msg.sender;
+        // require(
+        //     _escrowAddress != address(0) && msg.sender == owner,
+        //     "Invalid ESCROW address and/or unauthorized contract owner"
+        // );
+        // escrowContract = payable(_escrowAddress);
+        // // priceFeed = AggregatorV3Interface(_feddAddr);
+        // escrowInterface = IEcomEscrow(address(escrowContract));
         // adminDAOcontract = _adminDaoAddress;
     }
+
+    function initialize(
+        address _escrowAddress,
+        address initialOwner
+        // address _feedAddr //  address _adminDaoAddress
+    ) public initializer {
+        __Ownable_init(initialOwner);
+        __UUPSUpgradeable_init();
+        require(
+            _escrowAddress != address(0),
+            "Invalid ESCROW address"
+        );
+        escrowContract = payable(_escrowAddress);
+        // priceFeed = AggregatorV3Interface(_feedAddr);
+        escrowInterface = IEcomEscrow(address(escrowContract));
+        // adminDAOcontract = _adminDaoAddress;
+    }   
 
     struct OrderItem {
         uint256 sellerId;
@@ -545,6 +566,12 @@ contract Ecommerce {
         }
     }
 
+    function _authorizeUpgrade(address newImplementation)
+        internal
+        onlyOwner
+        override
+    {}
+
     function getUSDequivalence(
         uint _totalBill,
         string memory _paymentToken
@@ -640,8 +667,8 @@ contract Ecommerce {
         _;
     }
 
-    modifier onlyOwner() {
-        require(msg.sender == owner, "unauthorized owner");
-        _;
-    }
+    // modifier onlyOwner() {
+    //     require(msg.sender == owner, "unauthorized owner");
+    //     _;
+    // }
 }

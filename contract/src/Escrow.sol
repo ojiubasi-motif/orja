@@ -4,18 +4,22 @@ pragma solidity ^0.8.0;
 import {IEcomm} from "@custom-interfaces/IEcomm.sol";
 import {OrderLib} from "@library/OrderManager.sol";
 import "@chainlink/AggregatorV3Interface.sol";
+import "openzeppelin-contracts-upgradeable/contracts/access/OwnableUpgradeable.sol";
+import "openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
+import "openzeppelin-contracts-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
 // import "forge-std/console.sol";
 
 
-contract Escrow {
+contract Escrow is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     // 0x0f5C4Fdf728AAc8261FC17061c6dCFAb21D7bc62==verified
-    using OrderLib for OrderLib.UserType;
-    using OrderLib for OrderLib.VerificationStatus;
-    using OrderLib for OrderLib.User;
-    using OrderLib for OrderLib.OrderStatus;
-    using OrderLib for OrderLib.OrderItem;
+    // using OrderLib for OrderLib.UserType;
+    // using OrderLib for OrderLib.VerificationStatus;
+    // using OrderLib for OrderLib.User;
+    // using OrderLib for OrderLib.OrderStatus;
+    // using OrderLib for OrderLib.OrderItem;
 
-    address public owner;
+    // address public owner;
+    bool isEcommProxySet;
     address public ecommercePlatform;
     AggregatorV3Interface pricefeed;
 
@@ -26,18 +30,37 @@ contract Escrow {
         public withdrawableBalance;
 
     constructor() {
-        owner = msg.sender;
+        _disableInitializers();
+        // owner = msg.sender;
         // pricefeed = AggregatorV3Interface(_feedAddr);//remove before deployment to production
     
     }
 
+    function initialize(address initialOwner) public initializer {
+        __Ownable_init(initialOwner);
+        __UUPSUpgradeable_init();
+
+        // _setEcommercePlatform(ecommProxy);
+        // require(
+        //     _ecommercePlatform != address(0),
+        //     "Invalid ecommerce platform address"
+        // );
+        // ecommercePlatform = _ecommercePlatform;
+        // ecommInterface = IEcomm(ecommercePlatform);
+    }   
+
     function setEcommercePlatform(
         address _ecommercePlatform
-    ) external onlyContractOwner {
+    ) external onlyOwner {
+        require(
+            !isEcommProxySet,
+            "Ecommerce platform address has already been set"
+        );
         require(
             _ecommercePlatform != address(0),
             "Invalid ecommerce platform address"
         );
+        isEcommProxySet = true;
         ecommercePlatform = _ecommercePlatform;
         ecommInterface = IEcomm(ecommercePlatform);
     }
@@ -158,6 +181,12 @@ contract Escrow {
         }
     }
 
+    function _authorizeUpgrade(address newImplementation)
+        internal
+        onlyOwner
+        override
+    {}
+
     event DeliveryConfirmed(uint indexed userId, uint indexed payRef);
     event DeliveryPending(uint indexed userId, uint indexed payRef);
     event PaymentReceived(
@@ -179,13 +208,13 @@ contract Escrow {
         );
     }
 
-    modifier onlyContractOwner() {
-        require(
-            msg.sender == owner,
-            "Only the  deployer can call this function"
-        );
-        _;
-    }
+    // modifier onlyContractOwner() {
+    //     require(
+    //         msg.sender == owner,
+    //         "Only the  deployer can call this function"
+    //     );
+    //     _;
+    // }
 
     // modifier onlyOwner(){
     //     require

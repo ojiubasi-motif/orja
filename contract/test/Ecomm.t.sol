@@ -14,8 +14,8 @@ contract EcommTest is Test {
     Ecommerce public orja;
     Escrow public escrow;
     address constant deployer = address(0x5E1A7C6f994cb18d331c72EAc68768c6e2965ac6);
-    address constant ecomAddr = address(0x5E3d3cc318Bd4A760Fb24fF7C851aFeF06CE2E25);
-    address constant escrowAddr = address(0x61e7772709496451501DCd30a3D2422aA2Fdcb35);
+    address constant ecomAddr = address(0xfb472d475D8E86814d4E364A4DB1aFD68E9aF474);
+    address constant escrowAddr = address(0xcd2Ab703fE6C5622F0CEb3ba0798B279a57B83df);
     address seller1 ;
     address buyer1 ;
     // address deployer = makeAddr("deployer");
@@ -28,7 +28,9 @@ contract EcommTest is Test {
         vm.startPrank(deployer);
         // priceFeed = new MockV3Aggregator(8,2518e8);
         escrow = new Escrow();
-        orja = new Ecommerce(address(escrow));
+        orja = new Ecommerce(
+            // address(escrow)
+            );
         escrow.setEcommercePlatform(address(orja));
         // orja.addTokenToAcceptedList(
         //     address(0),
