@@ -1,0 +1,103 @@
+// Import all of Bootstrap's CSS
+.display-flex {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  
+  ul,p,div {
+    list-style: none;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  
+  .nav-list>li{
+  
+  }
+  .topnav-link,.side-nav{
+    text-decoration: none;
+    color: #00afef;
+    font-size: 16px;
+    font-weight: bolder;
+  }
+  .side-nav-list{}
+  .side-nav-list>p:hover{
+    color: #00afef;
+  }
+  .topnav-link:hover{
+    color: #00afef;
+    text-decoration: underline;
+  }
+  a {
+    font-weight: 500;
+    color: #646cff;
+    text-decoration: none;
+  }
+  a:hover {
+    color: #535bf2;
+  }
+  .default-btn{
+    background-color: #00afef;
+  }
+  
+  .form-elements input,
+  .form-elements textarea{
+    color: rgb(12, 12, 12);
+      outline: none;
+      width:50%;
+      border: 1px solid #F0F1F7;
+      border-radius: 8px;
+      padding: 0px 10px;
+      font-size: 16px;
+  }
+  
+  .form-elements input {
+      height: 40px;
+      background-color: #e3e5e7;
+  }
+  
+  .form-elements ::placeholder {
+      color: #676970;
+      opacity: 0.4;
+      font-size: 18px;
+  }
+  
+  .form-check-label {
+    margin-bottom: 0;
+  }
+  form::placeholder{
+      color: #4B506D;
+      opacity: 0.4;
+      font-size: 18px;
+  }
+  #batch span,#module span,input ~ span,textarea ~ span {
+      font-size: 12px;
+      display: none;
+      color: rgb(51, 47, 48);
+      padding: 3px;
+  }
+  #batch:invalid[focused="true"],#module:invalid[focused="true"],input:invalid[focused="true"],textarea:invalid[focused="true"]{
+      border: 1px solid crimson;
+  }
+  
+  input:invalid[focused="true"]{
+    border: 1px solid crimson;
+  }
+  
+  input{
+    border: 1px solid rgb(201, 88, 111);
+  }
+  
+  select:invalid[focused="true"] ~ span, input:invalid[focused="true"] ~ span, textarea:invalid[focused="true"] ~ span{
+      display: block;
+  }
+  input::placeholder, textarea::placeholder{
+      padding: 5px;
+      color: lightgrey;
+  }
+  
+  .modal-form-label{
+    min-width: 30%
+  }
+  
+  @import "bootstrap/scss/bootstrap";
