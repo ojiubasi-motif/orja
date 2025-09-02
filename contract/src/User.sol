@@ -55,8 +55,8 @@ contract TrussUser is Base {
 
     function register(
         string calldata _lastName,
-        string calldata _firstName,
-        UserType _userType
+        string calldata _firstName
+        // UserType _userType
     ) external {
         require(msg.sender != address(0), "Invalid address");
         require(
@@ -71,7 +71,7 @@ contract TrussUser is Base {
             _lastName,
             _firstName,
             msg.sender,
-            _userType,
+            // _userType,
             VerificationStatus.NotVerified
         );
         users.push(newUser);
@@ -80,7 +80,7 @@ contract TrussUser is Base {
         emit ResgisteredAuser(userId);
     }
 
-    function verifySeller(address _account) external onlyOwner {
+    function verifySeller(address _account) external onlyAdmins {
         User storage userData = users[userIdToRecordIndex[_account]];
         require(userData.account == _account, "account mismatch");
         require(
@@ -95,7 +95,7 @@ contract TrussUser is Base {
     function getUsers(
         uint _start,
         uint _end
-    ) external view onlyOwner returns (User[] memory) {
+    ) external view onlyAdmins returns (User[] memory) {
         // require(_start < _end, "Invalid range");
         require(_end < users.length, "End index out of bounds");
         require(
@@ -114,42 +114,20 @@ contract TrussUser is Base {
     }
 
     function getUserData(address _account) public view returns (User memory) {
-        require(isRegistered[_account], "account not registered");
+        // require(isRegistered[_account], "account not registered");
         User memory userData = users[userIdToRecordIndex[_account]];
-        require(
-            userData.account != address(0) && userData.account == _account,
-            "Invalid user address or user not registered"
-        );
+        // require(
+        //     userData.account != address(0) && userData.account == _account,
+        //     "Invalid user address or user not registered"
+        // );
         return userData;
     }
-// token utility functions=========
-    function addTokenToAcceptedList(
-        address _tokenAddress,
-        string memory _symbol,
-        address _feedAddress
-    ) external onlyOwner {
-        if (keccak256(bytes(_symbol)) == keccak256(bytes("ETH"))) {
-            address ethAddr = address(uint160(uint256(keccak256("ETH")))); //calculate address to use for eth
-            isAccepted["ETH"] = true;
-            tokenSymbolToDetails["ETH"] = Token({
-                feedAddr: _feedAddress, // Set the feed address if needed
-                tokenAddr: ethAddr
-            });
-        } else {
-            isAccepted[_symbol] = true;
-            tokenSymbolToDetails[_symbol] = Token({
-                feedAddr: _feedAddress, // Set the feed address if needed
-                tokenAddr: _tokenAddress
-            });
-        }
 
-        // acceptedTokens.push(TokenDetails(_symbol,_tokenAddress));
+    modifier onlyAdmins() {
+        require(msg.sender == owner() || msg.sender == address(0x56c92833A4A3dac0E7d8b56c31e3Fd52B5dEC856), "only admin can call this function");
+        _;
     }
 
-    function delistToken(string memory _symbol) external onlyOwner {
-        require(isAccepted[_symbol], "invalid Token symbol");
-        isAccepted[_symbol] = false;
-    }
 
     function _authorizeUpgrade(
         address newImplementation

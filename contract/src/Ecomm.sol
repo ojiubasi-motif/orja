@@ -7,6 +7,8 @@ import "./ERC20Base.sol";
 import "@chainlink/AggregatorV3Interface.sol";
 import {IUser, IShop, IProduct} from "./interfaces/IEcomm.sol";
 import {Utils, ProductsUtils} from "./lib/Utils.sol";
+import "forge-std/console.sol";
+
 
 // import "forge-std/console.sol";
 
@@ -18,7 +20,7 @@ contract Ecommerce is
     IEcomEscrow escrowInterface;
     IUser userInterface;
     IProduct productInterface;
-    //
+
     // AggregatorV3Interface internal priceFeed;
 
     address payable escrowContract;
@@ -59,6 +61,7 @@ contract Ecommerce is
         address _userContract,
         address _productContract,
         address initialOwner
+        // address _feedAddr  @test uncomment next line later in live deployment
     )
         public
         // address _feedAddr //  address _adminDaoAddress
@@ -73,6 +76,7 @@ contract Ecommerce is
         escrowContract = payable(_escrowAddress);
         userContract = _userContract;
         productContract = _productContract;
+        // @test======for contract test on foundry local---
         // priceFeed = AggregatorV3Interface(_feedAddr);
         escrowInterface = IEcomEscrow(address(escrowContract));
         userInterface = IUser(address(userContract));
@@ -104,9 +108,11 @@ contract Ecommerce is
         require(cartItems.length > 0, "Cart is empty");
         return cartItems;
     }
-
+// @test remove later
+    // function getFeed() external view override returns (address) {
+    //     return address(priceFeed);
+    // }
     
-
     // @dig try to use encoded data and private function to update multiple product details once
    
     function addProductToCart(
@@ -224,11 +230,11 @@ contract Ecommerce is
         uint256 paymentRef = _generatePaymentRefence(_account);
 
         // _checkoutAmount[paymentRef] = amountPayable;
-        if (keccak256(bytes(_paymentTokenSymbol)) == keccak256(bytes("ETH"))) {
+        // if (keccak256(bytes(_paymentTokenSymbol)) == keccak256(bytes("ETH"))) {
             (
                 uint expectedEthValue,
                 bytes memory feedData
-            ) = _getTokenEquivalence(amountPayable, "ETH");
+            ) = _getTokenEquivalence(amountPayable,"ETH");
 
             require(
                 msg.value >= expectedEthValue,
@@ -237,11 +243,11 @@ contract Ecommerce is
 
             _checkoutAmount[userData.userId] = 0;
             // amountPayable = 0; // reset the amount payable after checkout
-
+            // console.log("expectedEthValue==>", expectedEthValue);
             (bool payResponse, uint payRef) = escrowInterface
                 .payForItemsWithETH{value: expectedEthValue}(
                 userData.userId,
-                expectedEthValue,
+                amountPayable,
                 feedData,
                 paymentRef
             );
@@ -253,7 +259,7 @@ contract Ecommerce is
                 _paymentTokenSymbol,
                 expectedEthValue
             );
-        }
+        
     }
 
     function _checkOutWithUsd(
@@ -268,10 +274,10 @@ contract Ecommerce is
         uint256 amountPayable = calculateUserBill(userData.userId);
         uint256 paymentRef = _generatePaymentRefence(_account);
 
-        require(isAccepted[_paymentTokenSymbol], "invalid token");
+        require(escrowInterface.isAccepted(_paymentTokenSymbol), "invalid token");
         require(
-            tokenSymbolToDetails[_paymentTokenSymbol].feedAddr != address(0) &&
-                tokenSymbolToDetails[_paymentTokenSymbol].tokenAddr !=
+            escrowInterface.tokenSymbolToDetails(_paymentTokenSymbol).feedAddr != address(0) &&
+                escrowInterface.tokenSymbolToDetails(_paymentTokenSymbol).tokenAddr !=
                 address(0),
             "please specify a valid token for payment"
         );
@@ -281,7 +287,7 @@ contract Ecommerce is
             "the amount payable is zero, please check that cart isn't empty or that your payment token is valid"
         );
         // @dev inherit the erc20 interface if u want; although u reduce codesize just using the function u want
-        erc20 = IERC20(tokenSymbolToDetails[_paymentTokenSymbol].tokenAddr);
+        erc20 = IERC20(escrowInterface.tokenSymbolToDetails(_paymentTokenSymbol).tokenAddr);
         require(
             erc20.balanceOf(msg.sender) >= amountPayable,
             "insufficient balance of selected payment token, please topup"
@@ -311,14 +317,17 @@ contract Ecommerce is
         uint _totalBill,
         string memory _paymentToken
     ) private returns (uint256, bytes memory) {
-        require(isAccepted[_paymentToken], "invalid token");
+        console.log("payment token==>", _paymentToken);
+        console.log("is eth accepted?", escrowInterface.isAccepted(_paymentToken));
+        require(escrowInterface.isAccepted(_paymentToken), "invalid token instead of eth");
         require(
-            tokenSymbolToDetails[_paymentToken].feedAddr != address(0),
+            escrowInterface.tokenSymbolToDetails(_paymentToken).feedAddr != address(0),
             "invalid Token addr"
         );
-        // ======for contract test sake---
-        AggregatorV3Interface feed = AggregatorV3Interface(
-            tokenSymbolToDetails[_paymentToken].feedAddr //priceFeed address
+        // @test======for contract test on foundry local---
+        // (bool isTokenAccepted,Token memory tokenDetails) = escrowInterface.checkTokenStatusAndDetails(_paymentToken);
+        AggregatorV3Interface priceFeed = AggregatorV3Interface(
+            escrowInterface.tokenSymbolToDetails(_paymentToken).feedAddr //priceFeed address
         );
         (
             ,
@@ -326,9 +335,9 @@ contract Ecommerce is
             ,
             ,
 
-        ) = feed.latestRoundData();
+        ) = priceFeed.latestRoundData();
 
-        uint8 feedDecimals = feed.decimals();
+        uint8 feedDecimals = priceFeed.decimals();
 
         if (keccak256(bytes(_paymentToken)) == keccak256(bytes("ETH"))) {
             (uint256 _ethVal, bytes memory _callData) = Utils
@@ -344,7 +353,7 @@ contract Ecommerce is
                 ._getTokenEquivalence(
                     _totalBill,
                     _paymentToken,
-                    tokenSymbolToDetails[_paymentToken].tokenAddr,
+                    escrowInterface.tokenSymbolToDetails(_paymentToken).tokenAddr,
                     feedDecimals,
                     USD_DECIMALS,
                     uint(tokenPrice)

@@ -3,9 +3,9 @@ pragma solidity ^0.8.0;
 
 import "@chainlink/AggregatorV3Interface.sol";
 import {Product, OrderItem} from "../Common.sol";
+import "forge-std/console.sol";
 
 import {IProduct as ProductContract} from "../interfaces/IEcomm.sol";
-
 
 library Utils {
     // function _calculateTotalBill(
@@ -80,7 +80,8 @@ library Utils {
                 _feedDecimals,
                 _defaultDecimals
             );
-
+        // console.log("feedAnswer sh==>", feedAnswer);
+        // console.log("feeddecimal sh==>", _feedDecimals);
         bytes memory feedData = abi.encode("ETH", _feedDecimals, feedAnswer);
 
         return ((_totalBill * 1e18) / uint256(feedAnswer), feedData); //return the equivalent amount of eth in wei

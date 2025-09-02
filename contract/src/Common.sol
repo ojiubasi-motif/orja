@@ -21,7 +21,7 @@ struct User {
     string lastName;
     string firstName;
     address account;
-    UserType _userType;
+    // UserType _userType;
     VerificationStatus verificationStatus;
 }
 enum OrderStatus {
@@ -71,8 +71,8 @@ struct Category {
 }
 
 abstract contract Base is Initializable, OwnableUpgradeable, UUPSUpgradeable {
-    mapping(string => bool) isAccepted;
-    mapping(string => Token) public tokenSymbolToDetails;
+    //@test======for contract test on foundry local--
+    
 
     event WithdrawSuccess(
         uint256 indexed _userId,
@@ -81,7 +81,6 @@ abstract contract Base is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         uint256 _amount,
         uint256 indexed _date
     );
-
     event ProductOrderStatusUpdated(
         uint256 indexed _buyer,
         uint256 indexed _payref,
@@ -124,7 +123,7 @@ abstract contract Base is Initializable, OwnableUpgradeable, UUPSUpgradeable {
             "unauthorized address not allowed to list product"
         );
         require(
-            _user._userType == UserType.Seller &&
+            // _user._userType == UserType.Seller &&
                 _user.verificationStatus == VerificationStatus.Verified,
             "only verified sellers can list products"
         );

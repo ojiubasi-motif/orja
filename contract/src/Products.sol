@@ -54,7 +54,7 @@ contract Products is Base, IProduct {
         Product memory newProductData = Product({
             productId: id,
             sellerId: sellerData.userId,
-            unitPrice: _unitprice, //price is in _protocol default decimal[USD_DECIMALS] i.e 8
+            unitPrice: _unitprice, //just to avoid loss of precision, price is multiplied by 1e8
             waranteeDuration: _waranteeDuration,
             title: _title,
             // features: _spec,

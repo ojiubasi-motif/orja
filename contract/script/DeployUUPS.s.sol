@@ -71,6 +71,13 @@ contract DeployUUPS is Script {
         // Step 3: Wire them(Escrow and Ecommerce) together
         Escrow(payable(address(escrowProxy))).setEcommercePlatform(address(ecommerceProxy));
 
+        // let's list Eth as accepted token
+        Escrow(payable(address(escrowProxy))).addTokenToAcceptedList(
+            address(0),
+            "ETH",
+            0x4aDC67696bA383F43DD60A9e78F2C97Fbbfc7cb1 // chainlik feed address or sepolia-base eth
+        );
+
         vm.stopBroadcast();
         console.log("User Manager Imp:", address(userManagerImpl));
         console.log("product Impl:", address(productsImpl));

@@ -1,26 +1,40 @@
 // SPDX-License-Identifier: SEE LICENSE IN LICENSE
 pragma solidity ^0.8.0;
 
+/** 
+ * ====deployed and verified on base on 9-2-2025========
+ * User Manager Imp: 0xc54Cb991a832B40Cb7BCF20a32AE58fbCc0ae937
+  product Impl: 0xE325Aadd3286013510e05aEdEFeE49Aae8bB3687
+  Ecommerce Impl: 0xaC0db7a863492e28de0057A59cf5b8dd7A4F6849
+  Escrow Impl: 0x160b819F97F9a00BF6A39e390A7D93D329211752
+  User Manager proxy: 0xE4b7Ff08bDA75541620356d283eb10E3DB44EeDB
+  product proxy: 0x1fa790Bf376013277B8Aa7506D330c417A1dc155
+  Ecommerce Proxy: 0x09EB12CbCDa3E5ad65874bc54330782fa8d51DD9
+  Escrow Proxy: 0x2163fee47139C909ad093e4E0eE22A119B5Df206
+*/
+
 import "./ERC20Base.sol";
 import "./Common.sol";
-import {IShop,IUser} from "@custom-interfaces/IEcomm.sol";
-
+import {IShop, IUser} from "@custom-interfaces/IEcomm.sol";
+import {IEcomEscrow} from "@custom-interfaces/IEscrow.sol";
 import "@chainlink/AggregatorV3Interface.sol";
+import "forge-std/console.sol";
 
-contract Escrow is
-    Base,
-    ERC20Base
-{
-   
+contract Escrow is Base, ERC20Base {
+    mapping(string => bool) public isAccepted;
+    mapping(string => Token) public tokenSymbolToDetails;
+    string[] public acceptedTokens;
+
     bool isEcommAndUserManagerProxySet;
     address public ecommercePlatform;
     address public userContract;
-    AggregatorV3Interface pricefeed;
+    // @test uncomment next line later in live deployment
+    AggregatorV3Interface priceFeed;
+
     // IERC20 erc20Interface;
 
     IShop ecommInterface;
     IUser userInterface;
-
 
     mapping(uint256 _userId => mapping(uint256 _paymentRef => uint256 _balance))
         private userBalance;
@@ -39,15 +53,18 @@ contract Escrow is
         // pricefeed = AggregatorV3Interface(_feedAddr);//remove before deployment to production
     }
 
-    function initialize(address _userContractAddress,address initialOwner) public initializer {
+    function initialize(
+        address _userContractAddress,
+        address initialOwner
+    ) public initializer {
         __Ownable_init(initialOwner);
         __UUPSUpgradeable_init();
 
-         require(
+        require(
             _userContractAddress != address(0),
             "Invalid usermanager contract addresses set"
         );
-        
+
         userContract = _userContractAddress;
         userInterface = IUser(userContract);
     }
@@ -63,22 +80,88 @@ contract Escrow is
             _ecommercePlatform != address(0),
             "Invalid ecommerce contract addresses set"
         );
-        isEcommAndUserManagerProxySet = true;//permanently sets the ecommerce platform address
+        isEcommAndUserManagerProxySet = true; //permanently sets the ecommerce platform address
 
         ecommercePlatform = _ecommercePlatform;
         ecommInterface = IShop(ecommercePlatform);
 
+        //    priceFeed = AggregatorV3Interface(ecommInterface.getFeed()); //@test uncomment next line later in live deployment
         // userContract = _userContract;
-        
     }
 
-    function getWithdrawableBalance(uint256 _userId, uint256 _ref) public view returns(uint256){
-        require(userInterface.getUserData(msg.sender).userId == _userId, "unauthorized caller");
+    // token utility functions=========
+    function addTokenToAcceptedList(
+        address _tokenAddress,
+        string memory _symbol,
+        address _feedAddress
+    ) external onlyOwner {
+        require(!isAccepted[_symbol], "Token already listed");
+        //  acceptedTokens.push(_symbol);
+        if (keccak256(bytes(_symbol)) == keccak256(bytes("ETH"))) {
+            require(_feedAddress != address(0), "feedAddres address(0)");
+            address ethAddr = address(uint160(uint256(keccak256("ETH")))); //calculate address to use for eth
+            isAccepted["ETH"] = true;
+            tokenSymbolToDetails["ETH"] = Token({
+                feedAddr: _feedAddress, // Set the feed address if needed
+                tokenAddr: ethAddr
+            });
+        } else {
+            require(_tokenAddress != address(0), "tokenAddress address(0)");
+            require(_feedAddress != address(0), "feedAddres address(0)");
+            isAccepted[_symbol] = true;
+            tokenSymbolToDetails[_symbol] = Token({
+                feedAddr: _feedAddress, // Set the feed address if needed
+                tokenAddr: _tokenAddress
+            });
+        }
+
+        acceptedTokens.push(_symbol);
+    }
+
+    function delistToken(string memory _symbol) external onlyOwner {
+        require(isAccepted[_symbol], "invalid Token symbol");
+        isAccepted[_symbol] = false;
+    }
+
+    function getAcceptedTokens() external view returns (string[] memory) {
+        return acceptedTokens;
+    }
+
+    function checkTokenStatusAndDetails(
+        string memory _symbol
+    ) external view returns (bool, Token memory) {
+        return (isAccepted[_symbol], tokenSymbolToDetails[_symbol]);
+    }
+
+    function getWithdrawableBalance(
+        uint256 _userId,
+        uint256 _ref
+    )
+        public
+        view
+        isAuthorizedCaller(
+            userInterface.getUserData(msg.sender).userId,
+            _userId,
+            msg.sender
+        )
+        returns (uint256)
+    {
         return withdrawableBalance[_userId][_ref];
     }
 
-    function getWalletBalance(uint256 _userId, uint256 _payRef) public view returns(uint256){
-        require(userInterface.getUserData(msg.sender).userId == _userId, "unauthorized caller");
+    function getWalletBalance(
+        uint256 _userId,
+        uint256 _payRef
+    )
+        public
+        view
+        isAuthorizedCaller(
+            userInterface.getUserData(msg.sender).userId,
+            _userId,
+            msg.sender
+        )
+        returns (uint256)
+    {
         return userBalance[_userId][_payRef];
     }
 
@@ -97,11 +180,11 @@ contract Escrow is
         (string memory _symbol, uint8 _decimal, int256 _tokenPrice) = abi
             .decode(_feedData, (string, uint8, int256));
         require(_tokenPrice > 0, "Invalid price fetched from feed");
+
         uint EthvalueInUsd = (msg.value * uint(_tokenPrice)) / 1e18; // Assuming pricefeed returns price in 8 decimals
         uint diff = EthvalueInUsd > _bill
             ? EthvalueInUsd - _bill
             : _bill - EthvalueInUsd;
-
         require(
             diff <= 10 ** (_decimal - 2), // 1e6(0.01USD) if decimal==8 etc...
             "too much difference between payment and calculated checkout amount, try again"
@@ -116,6 +199,7 @@ contract Escrow is
         paymentRefToToken[_payRef] = _symbol;
         tokenPriceAtcheckout[_payRef] = uint(_tokenPrice);
         // For example, transfer funds to the seller
+        console.log("user cart balance==>", userBalance[_userId][_payRef]);
         // and emit an event for the transaction
         return (true, _payRef);
     }
@@ -131,20 +215,18 @@ contract Escrow is
             "only ecommerce contract can interract with this function"
         );
         // require(msg.value > 0, "Payment must be greater than zero");
-
-        pricefeed = AggregatorV3Interface(
-            tokenSymbolToDetails[_paymentTokenSymbol].feedAddr
-        );
-        uint8 UsdDecimals = AggregatorV3Interface(
-            tokenSymbolToDetails[_paymentTokenSymbol].feedAddr
-        ).decimals();
+        // @test uncomment next line b4 live deploy
+        // priceFeed = AggregatorV3Interface(
+        //     tokenSymbolToDetails[_paymentTokenSymbol].feedAddr
+        // );
+        uint8 UsdDecimals = priceFeed.decimals();
         (
             ,
             /* uint80 roundId */ int256 tokenPrice /*uint256 startedAt*/ /*uint256 updatedAt*/ /*uint80 answeredInRound*/,
             ,
             ,
 
-        ) = pricefeed.latestRoundData();
+        ) = priceFeed.latestRoundData();
         require(tokenPrice > 0, "Invalid price fetched from feed");
 
         uint256 allowedDiff = 10 ** (UsdDecimals - 3); //i.e 0.001 USDT, USDC, BUSD
@@ -192,8 +274,7 @@ contract Escrow is
                     "only seller of product can order for cancellation"
                 );
                 require(
-                    trxToCart[_payRef][i].orderStatus ==
-                        OrderStatus.Processing,
+                    trxToCart[_payRef][i].orderStatus == OrderStatus.Processing,
                     "Order has already been processed"
                 );
                 letBuyerCancel[_payRef][trxToCart[_payRef][i].productId] = true;
@@ -207,6 +288,10 @@ contract Escrow is
         }
     }
 
+    function _trussFee(uint _amount) internal pure returns (uint) {
+        return (_amount * 1000) - (_amount * 999); //0.1% fee
+    }
+
     function _updateDeliveryStatus(
         uint _payRef,
         uint _productId,
@@ -215,9 +300,7 @@ contract Escrow is
         // !!!! define a library for enums...
         User memory buyer = userInterface.getUserData(msg.sender);
         require(msg.sender == buyer.account, "unathorized caller");
-        OrderItem[] memory allCartItems = ecommInterface.getCart(
-            buyer.userId
-        );
+        OrderItem[] memory allCartItems = ecommInterface.getCart(buyer.userId);
 
         // Logic to update delivery status
         for (uint i = 0; i < allCartItems.length; i++) {
@@ -227,8 +310,7 @@ contract Escrow is
                     "malicious action detected, seller cannot confirm delivery of their own product"
                 );
                 require(
-                    allCartItems[i].orderStatus ==
-                        OrderStatus.Processing,
+                    allCartItems[i].orderStatus == OrderStatus.Processing,
                     "Order already delivered or not in processing state"
                 );
                 // cartItem = allCartItems[i];
@@ -250,15 +332,16 @@ contract Escrow is
                         uint256(allCartItems[i].unitPrice) *
                         allCartItems[i].qty;
                 }
+                uint256 _balAfterFee = _bal - _trussFee(_bal);
                 // execute the delivery confirmation logic
                 if (_isDelivered) {
                     allCartItems[i].orderStatus = OrderStatus.Delivered;
                     userBalance[buyer.userId][_payRef] -= _bal; // deduct it from the buyer balance
-                    userBalance[allCartItems[i].sellerId][_payRef] += _bal; //add it to the seller balance
+                    // userBalance[allCartItems[i].sellerId][_payRef] += _bal; //add it to the seller balance
+
                     withdrawableBalance[allCartItems[i].sellerId][
                         _payRef
-                    ] += _bal; // add it to the seller withdrawable balance
-
+                    ] += _balAfterFee; // add it to the seller withdrawable balance
                 } else {
                     require(
                         allCartItems[i]._proposedDeliveryTime + 60 seconds <
@@ -269,10 +352,15 @@ contract Escrow is
                     //seller could not deliver
                     allCartItems[i].orderStatus = OrderStatus.Canceled;
                     userBalance[buyer.userId][_payRef] -= _bal; //remove from balance of the buyer
-                    withdrawableBalance[buyer.userId][_payRef] += _bal; //add to buyer withdrawable balance
+                    withdrawableBalance[buyer.userId][_payRef] += _balAfterFee; //add to buyer withdrawable balance
                     // emit DeliveryPending(_userId, _payRef);
                 }
-                emit ProductOrderStatusUpdated(buyer.userId, _payRef, _productId, _isDelivered);
+                emit ProductOrderStatusUpdated(
+                    buyer.userId,
+                    _payRef,
+                    _productId,
+                    _isDelivered
+                );
                 break;
             } else
                 require(
@@ -285,12 +373,18 @@ contract Escrow is
 
     function withdrawFunds(uint256 _payRef, uint256 _amount) external {
         User memory user = userInterface.getUserData(msg.sender);
-        require(msg.sender == user.account, "unathorized caller");
+        require(msg.sender == user.account, "not a registered user"); //@dig is this not tautology?
         uint256 withdrawable = withdrawableBalance[user.userId][_payRef];
         require(withdrawable >= _amount, "No funds available for withdrawal");
         // do proper accounting before withdrawal
+        console.log(
+            "withdrawing amount in escrow==>",
+            withdrawable,
+            "amount==>",
+            _amount
+        );
         withdrawableBalance[user.userId][_payRef] -= _amount;
-        userBalance[user.userId][_payRef] -= _amount;
+        // userBalance[user.userId][_payRef] -= _amount;
         // @dev do not delete listed token data, you may only disable its usage with bool
         string memory _token = _checkWithdrawToken(_payRef);
 
@@ -299,9 +393,7 @@ contract Escrow is
             payable(msg.sender).transfer(_amount);
         } else {
             // token is other erc20 token
-            erc20 = IERC20(
-                tokenSymbolToDetails[_token].tokenAddr
-            );
+            erc20 = IERC20(tokenSymbolToDetails[_token].tokenAddr);
             safeWithdrawFromEscrow(erc20, msg.sender, _amount);
         }
         emit WithdrawSuccess(
@@ -348,5 +440,20 @@ contract Escrow is
             "Incorrect funds sent to escrow"
         );
     }
+
+    modifier isAuthorizedCaller(
+        uint256 _callerId,
+        uint256 _userId,
+        address _account
+    ) {
+        require(
+            _callerId == _userId ||
+                _account == ecommercePlatform ||
+                _account == address(this),
+            "unauthorized caller not allowed"
+        );
+        _;
+    }
+
     receive() external payable {}
 }

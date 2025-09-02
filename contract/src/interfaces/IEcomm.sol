@@ -7,7 +7,7 @@ interface IShop {
    
     // function userCheckoutAmount(uint256 _payRef) external view returns (uint256);
     
-   
+//    function getFeed() external view returns (address);
 
     function getCart(
         uint256 _user
@@ -47,3 +47,4 @@ interface IProduct{
     //     uint256 _productId
     // ) external view returns (Product memory);
 }
+
