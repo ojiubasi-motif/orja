@@ -1,0 +1,21 @@
+testMode: "assertion"
+prefix: "echidna_"
+coverage: true
+corpusDir: "corpus"
+
+cryticArgs: ["--foundry-compile-all"]
+deployer: "0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38"
+contractAddr: "0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496"
+shrinkLimit: 100000
+testGasLimit: 8000000
+testLimit: 50000
+
+filterFunctions: ["ecommerce.renounceOwnership()", "ecommerce.transferOwnership(address)",
+                  "ecommerce.upgradeToAndCall(address,bytes)",
+                  "escrow.renounceOwnership()", "escrow.transferOwnership(address)",
+                  "trussUser.renounceOwnership()", "trussUser.transferOwnership(address)",
+                  "escrow.upgradeToAndCall(address,bytes)",
+                  "trussUser.upgradeToAndCall(address,bytes)","products.upgradeToAndCall(address,bytes)",
+                  "products.renounceOwnership()", "products.transferOwnership(address)","ecommerce.initialize(address,address,address,address)",
+                   "trussUser.initialize(address)","escrow.initialize(address,address)",
+                   "products.initialize(address,address)"]

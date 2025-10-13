@@ -73,7 +73,6 @@ struct Category {
 abstract contract Base is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     //@test======for contract test on foundry local--
     
-
     event WithdrawSuccess(
         uint256 indexed _userId,
         string _tokenSymbol,
@@ -92,7 +91,7 @@ abstract contract Base is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         uint indexed _ref,
         uint indexed _item
     );
-    event ResgisteredAuser(uint256 indexed _userId);
+    event ResgisteredAuser(uint256 indexed _userId, address indexed _account);
     event AccountOwnershipChanged(
         uint256 indexed _userId,
         address _changedBy,

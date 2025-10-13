@@ -1,0 +1,29 @@
+testMode: "assertion"
+prefix: "echidna_"
+coverage: true
+corpusDir: "echidna"
+balanceAddr: 0x1043561a8829300000
+balanceContract: 0x1043561a8829300000
+# filterBlacklist: false
+# filterFunctions: ["CryticTester.getProductData(uint256)", "CryticTester.getProducts(uint256,uint256)", "CryticTester.getUserData(address)", 
+#                 "CryticTester.register(string,string)", "CryticTester.trussUser_onlyAdminCanVerify(address)", "CryticTester.trussUser_register()", 
+#                 "CryticTester.trussUser_verifySeller(address)", "CryticTester.adminVerifyUser(address)", "CryticTester.trussUser_oneAddrPerUser()",
+#                 "CryticTester.products_listProduct(uint256,string,uint256,uint256)","CryticTester.products_updateProductPrice(uint256,uint256)",
+#                 "CryticTester.products_onlyVerifiedUsersCanListProducts()"]
+filterFunctions: ["CryticTester.renounceOwnership()", "CryticTester.transferOwnership(address)",
+                  "CryticTester.upgradeToAndCall(address,bytes)",
+                  "CryticTester.renounceOwnership()", "CryticTester.transferOwnership(address)",
+                  "CryticTester.renounceOwnership()", "CryticTester.transferOwnership(address)",
+                  "CryticTester.upgradeToAndCall(address,bytes)",
+                  "CryticTester.upgradeToAndCall(address,bytes)","CryticTester.upgradeToAndCall(address,bytes)",
+                  "CryticTester.renounceOwnership()", "CryticTester.transferOwnership(address)","CryticTester.initialize(address,address,address,address)",
+                   "CryticTester.initialize(address)","CryticTester.initialize(address,address)",
+                   "CryticTester.initialize(address,address)","CryticTester._transferOwnership(address)"]
+
+cryticArgs: ["--foundry-compile-all"]
+deployer: "0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38"
+contractAddr: "0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496"
+# shrinkLimit: 50000
+# testGasLimit: 8000000
+testLimit: 50000
+seqLength: 40

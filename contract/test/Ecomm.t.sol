@@ -252,8 +252,8 @@ contract EcommTest is Test {
         vm.startPrank(buyer1);
         OrderItem[] memory cartItems = trussProxy.getCart(buyer1Id);
         vm.warp(block.timestamp + 7 days + 61 seconds); //fast forward time by 7 days + 61 seconds==there's grace of 60secs in the contract
-        updateDeliveryStatus(cartItems[0].productId, _payref, false);
-        updateDeliveryStatus(cartItems[1].productId, _payref, true);
+        updateDeliveryStatus(cartItems[0].productId, _payref, true);
+        updateDeliveryStatus(cartItems[1].productId, _payref, false);
         uint userWithdrawableBalB4 = escrowProxy.getWithdrawableBalance(buyer1Id, _payref);
         // uint userWalletBalb4 = buyer1.balance;
         console.log("user withdrawable bal b4==>", userWithdrawableBalB4);

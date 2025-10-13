@@ -47,7 +47,7 @@ contract Escrow is Base, ERC20Base {
     mapping(uint256 _payref => mapping(uint256 _product => bool _cancel)) letBuyerCancel;
     mapping(uint256 _payref => OrderItem[] _order) trxToCart;
 
-    constructor() {
+    constructor()  {
         _disableInitializers();
         // owner = msg.sender;
         // pricefeed = AggregatorV3Interface(_feedAddr);//remove before deployment to production
@@ -56,7 +56,7 @@ contract Escrow is Base, ERC20Base {
     function initialize(
         address _userContractAddress,
         address initialOwner
-    ) public initializer {
+    ) external  initializer {
         __Ownable_init(initialOwner);
         __UUPSUpgradeable_init();
 
@@ -85,7 +85,7 @@ contract Escrow is Base, ERC20Base {
         ecommercePlatform = _ecommercePlatform;
         ecommInterface = IShop(ecommercePlatform);
 
-        //    priceFeed = AggregatorV3Interface(ecommInterface.getFeed()); //@test uncomment next line later in live deployment
+           priceFeed = AggregatorV3Interface(ecommInterface.getFeed()); //@test uncomment next line later in live deployment
         // userContract = _userContract;
     }
 
@@ -341,7 +341,7 @@ contract Escrow is Base, ERC20Base {
 
                     withdrawableBalance[allCartItems[i].sellerId][
                         _payRef
-                    ] += _balAfterFee; // add it to the seller withdrawable balance
+                    ] += _balAfterFee; // add it to the seller withdrawable balance after deducting truss fee
                 } else {
                     require(
                         allCartItems[i]._proposedDeliveryTime + 60 seconds <

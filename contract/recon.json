@@ -1,0 +1,177 @@
+{
+  "out/Ecomm.sol/Ecommerce.json": {
+    "functions": [
+      {
+        "signature": "addProductToCart(uint256,uint32)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "checkOutWithNative(string)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "checkOutWithUSD(string)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "initialize(address,address,address,address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "renounceOwnership()",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "transferOwnership(address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "upgradeToAndCall(address,bytes)",
+        "actor": "actor",
+        "mode": "normal"
+      }
+    ],
+    "separated": true
+  },
+  "out/Escrow.sol/Escrow.json": {
+    "functions": [
+      {
+        "signature": "addTokenToAcceptedList(address,string,address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "delistToken(string)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "initialize(address,address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "payForItemsWithETH(uint256,uint256,bytes,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "payForItemsWithUsd(uint256,uint256,string,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "renounceOwnership()",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "sellerCancelDelivery(uint256,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "setEcommercePlatform(address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "transferOwnership(address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "updateDeliveryStatus(uint256,uint256,bool)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "upgradeToAndCall(address,bytes)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "withdrawFunds(uint256,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      }
+    ],
+    "separated": true
+  },
+  "out/Products.sol/Products.json": {
+    "functions": [
+      {
+        "signature": "initialize(address,address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "listProduct(uint256,string,uint256,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "renounceOwnership()",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "transferOwnership(address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "updateProductPrice(address,uint256,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "upgradeToAndCall(address,bytes)",
+        "actor": "actor",
+        "mode": "normal"
+      }
+    ],
+    "separated": true
+  },
+  "out/User.sol/TrussUser.json": {
+    "functions": [
+      {
+        "signature": "initialize(address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "register(string,string)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "renounceOwnership()",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "transferOwnership(address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "upgradeToAndCall(address,bytes)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "verifySeller(address)",
+        "actor": "actor",
+        "mode": "normal"
+      }
+    ],
+    "separated": true
+  }
+}

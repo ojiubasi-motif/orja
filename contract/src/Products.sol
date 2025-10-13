@@ -3,7 +3,7 @@ pragma solidity ^0.8.13;
 
 
 import {IProduct,IUser} from "./interfaces/IEcomm.sol";
-import {Utils,ProductsUtils} from "./lib/Utils.sol";
+import {Utils,ProductsUtils} from "./truss-lib/Utils.sol";
 import "./Common.sol";
 
 contract Products is Base, IProduct {
@@ -15,7 +15,6 @@ contract Products is Base, IProduct {
 
     mapping(uint256 => uint256) productIdToRecordIndex;
     
-
     constructor() // address _escrowAddress
     // address _feddAddr //  address _adminDaoAddress
     {
@@ -26,7 +25,7 @@ contract Products is Base, IProduct {
         address _userContractAddress,
         address initialOwner
     )
-        public
+        external
         // address _feedAddr //  address _adminDaoAddress
         initializer
     {
@@ -47,7 +46,8 @@ contract Products is Base, IProduct {
         uint256 _waranteeDuration,
         // uint8[] calldata _categories,
         uint256 _expectedDeliveryTime
-    ) external {
+    ) external returns (uint256 _productId) {
+        require(_unitprice > 0, "Price must be greater than zero");
         User memory sellerData = userInterface.getUserData(msg.sender);
         _isCallerSeller(sellerData);
         uint256 id = Utils._generateProductId(_title, msg.sender);
@@ -64,19 +64,20 @@ contract Products is Base, IProduct {
         products.push(newProductData);
         productIdToRecordIndex[id] = products.length - 1;
         emit ResgisteredAProduct(id, sellerData.userId);
+        return id;
     }
 
     function updateProductPrice(
-        address _account,
+        // address _account,
         uint256 _productId,
         uint256 _newPrice
     ) external {
-        _isCallerSeller(userInterface.getUserData(_account));
+        User memory userData = userInterface.getUserData(msg.sender);
+        _isCallerSeller(userData);
         Product storage productData = products[
             productIdToRecordIndex[_productId]
         ];
         require(productData.productId != 0, "Product not found");
-        User memory userData = userInterface.getUserData(_account);
         require(
             userData.userId == productData.sellerId,
             "you're not the product owner"
@@ -90,7 +91,7 @@ contract Products is Base, IProduct {
 
     function getProductData(
         uint256 _productId
-    ) external view override returns (Product memory) {
+    ) external view override returns (Product memory) { 
         Product memory _product = products[productIdToRecordIndex[_productId]];
         require(
             _product.productId != 0 && _product.productId == _productId,

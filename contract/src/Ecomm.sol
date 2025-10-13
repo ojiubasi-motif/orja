@@ -6,7 +6,7 @@ import "./Common.sol";
 import "./ERC20Base.sol";
 import "@chainlink/AggregatorV3Interface.sol";
 import {IUser, IShop, IProduct} from "./interfaces/IEcomm.sol";
-import {Utils, ProductsUtils} from "./lib/Utils.sol";
+import {Utils, ProductsUtils} from "./truss-lib/Utils.sol";
 import "forge-std/console.sol";
 
 
@@ -20,8 +20,8 @@ contract Ecommerce is
     IEcomEscrow escrowInterface;
     IUser userInterface;
     IProduct productInterface;
-
-    // AggregatorV3Interface internal priceFeed;
+// @test======for contract test on foundry local---
+    AggregatorV3Interface internal priceFeed;
 
     address payable escrowContract;
     address userContract;
@@ -60,10 +60,10 @@ contract Ecommerce is
         address _escrowAddress,
         address _userContract,
         address _productContract,
-        address initialOwner
-        // address _feedAddr  @test uncomment next line later in live deployment
+        address initialOwner,
+        address _feedAddr // @test uncomment next line later in live deployment
     )
-        public
+        external
         // address _feedAddr //  address _adminDaoAddress
         initializer
     {
@@ -76,8 +76,8 @@ contract Ecommerce is
         escrowContract = payable(_escrowAddress);
         userContract = _userContract;
         productContract = _productContract;
-        // @test======for contract test on foundry local---
-        // priceFeed = AggregatorV3Interface(_feedAddr);
+        // @test======remove later local---
+        priceFeed = AggregatorV3Interface(_feedAddr);
         escrowInterface = IEcomEscrow(address(escrowContract));
         userInterface = IUser(address(userContract));
         productInterface = IProduct(address(productContract));
@@ -109,9 +109,9 @@ contract Ecommerce is
         return cartItems;
     }
 // @test remove later
-    // function getFeed() external view override returns (address) {
-    //     return address(priceFeed);
-    // }
+    function getFeed() external view override returns (address) {
+        return address(priceFeed);
+    }
     
     // @dig try to use encoded data and private function to update multiple product details once
    
@@ -325,10 +325,10 @@ contract Ecommerce is
             "invalid Token addr"
         );
         // @test======for contract test on foundry local---
-        // (bool isTokenAccepted,Token memory tokenDetails) = escrowInterface.checkTokenStatusAndDetails(_paymentToken);
-        AggregatorV3Interface priceFeed = AggregatorV3Interface(
-            escrowInterface.tokenSymbolToDetails(_paymentToken).feedAddr //priceFeed address
-        );
+        
+        // AggregatorV3Interface priceFeed = AggregatorV3Interface(
+        //     escrowInterface.tokenSymbolToDetails(_paymentToken).feedAddr //priceFeed address
+        // );
         (
             ,
             /* uint80 roundId */ int256 tokenPrice /*uint256 startedAt*/ /*uint256 updatedAt*/ /*uint80 answeredInRound*/,

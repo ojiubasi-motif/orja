@@ -6,8 +6,8 @@ pragma solidity >=0.8.26;
 interface IShop {
    
     // function userCheckoutAmount(uint256 _payRef) external view returns (uint256);
-    
-//    function getFeed() external view returns (address);
+    // @test remove later
+   function getFeed() external view returns (address);
 
     function getCart(
         uint256 _user

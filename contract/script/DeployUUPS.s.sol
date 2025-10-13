@@ -43,7 +43,6 @@ contract DeployUUPS is Script {
             escrowInitData
         );
 
-        
         bytes memory productInitData = abi.encodeWithSelector(
             Products.initialize.selector,
             address(userManagerProxy), // pass userManager

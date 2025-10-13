@@ -6,7 +6,7 @@ import "./Common.sol";
 contract TrussUser is Base {
     mapping(address => bool) private isRegistered; //is acc is registered
     mapping(address => bool) private isVerified; //is acc verified?
-    mapping(address => uint256) private userIdToRecordIndex;
+    mapping(address => uint256) private userToRecordIndex;
 
     // address payable escrowContract;
 
@@ -22,7 +22,7 @@ contract TrussUser is Base {
         // address _escrowAddress,
         address initialOwner
     )
-        public
+        external
         // address _feedAddr //  address _adminDaoAddress
         initializer
     {
@@ -56,8 +56,8 @@ contract TrussUser is Base {
     function register(
         string calldata _lastName,
         string calldata _firstName
-        // UserType _userType
-    ) external {
+    ) external // UserType _userType
+    {
         require(msg.sender != address(0), "Invalid address");
         require(
             !isRegistered[msg.sender],
@@ -76,13 +76,15 @@ contract TrussUser is Base {
         );
         users.push(newUser);
         // uint dataindex = /;
-        userIdToRecordIndex[msg.sender] = users.length - 1;
-        emit ResgisteredAuser(userId);
+        userToRecordIndex[msg.sender] = users.length - 1;
+        emit ResgisteredAuser(userId, msg.sender);
     }
 
+    // function ch
     function verifySeller(address _account) external onlyAdmins {
-        User storage userData = users[userIdToRecordIndex[_account]];
-        require(userData.account == _account, "account mismatch");
+        require(_account != address(0), "not a valid account");
+        User storage userData = users[userToRecordIndex[_account]];
+        require(userData.account == _account, "account mismatch"); //this ensures address is registered
         require(
             !isVerified[userData.account],
             "this seller is already Verified!"
@@ -114,20 +116,23 @@ contract TrussUser is Base {
     }
 
     function getUserData(address _account) public view returns (User memory) {
-        // require(isRegistered[_account], "account not registered");
-        User memory userData = users[userIdToRecordIndex[_account]];
-        // require(
-        //     userData.account != address(0) && userData.account == _account,
-        //     "Invalid user address or user not registered"
-        // );
-        return userData;
+        require(users.length > 0, "users array empty");
+        User memory userData = users[userToRecordIndex[_account]];
+        return
+            userData.account == _account
+                ? userData
+                : User(0, "", "", address(0), VerificationStatus.NotVerified);
     }
 
     modifier onlyAdmins() {
-        require(msg.sender == owner() || msg.sender == address(0x56c92833A4A3dac0E7d8b56c31e3Fd52B5dEC856), "only admin can call this function");
+        require(
+            msg.sender == owner() ||
+                msg.sender ==
+                address(0x56c92833A4A3dac0E7d8b56c31e3Fd52B5dEC856),
+            "only admin can call this function"
+        );
         _;
     }
-
 
     function _authorizeUpgrade(
         address newImplementation

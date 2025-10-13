@@ -6,7 +6,6 @@ import "@chainlink/AggregatorV3Interface.sol";
 contract MockV3Aggregator is AggregatorV3Interface {
     int256 public answer;
     uint8 public override decimals;
-
     constructor(uint8 _decimals, int256 _initialAnswer) {
         decimals = _decimals;
         answer = _initialAnswer;

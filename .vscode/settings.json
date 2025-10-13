@@ -1,0 +1,6 @@
+{
+    "recon.foundryConfigPath": "contract/foundry.toml",
+    "recon.defaultFuzzer": "echidna",
+    "recon.showAllFiles": true,
+    "recon.echidna.testLimit": 50000
+}
