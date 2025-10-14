@@ -37,6 +37,14 @@ contract Products is Base, IProduct {
 
         userInterface = IUser(address(userContract));
     }
+    /**=========================
+     * Fuzz related functions
+    ============================*/
+    function isProductListed(uint256 _productId) public view returns (bool) {
+        if (products.length == 0) return false;
+        // Product memory prod = products[productIdToRecordIndex[_productId]];
+        return productIdToRecordIndex[_productId] > 0;
+    }
 
     function listProduct(
         // address _seller,
@@ -77,7 +85,7 @@ contract Products is Base, IProduct {
         Product storage productData = products[
             productIdToRecordIndex[_productId]
         ];
-        require(productData.productId != 0, "Product not found");
+        require(productData.productId != 0 && productData.productId == _productId, "Product not found");
         require(
             userData.userId == productData.sellerId,
             "you're not the product owner"
@@ -92,12 +100,13 @@ contract Products is Base, IProduct {
     function getProductData(
         uint256 _productId
     ) external view override returns (Product memory) { 
+        require(products.length > 0, "products array empty");
         Product memory _product = products[productIdToRecordIndex[_productId]];
-        require(
-            _product.productId != 0 && _product.productId == _productId,
-            "Invalid product id"
-        );
-        return _product;
+        // require(
+        //     _product.productId != 0 && _product.productId == _productId,
+        //     "Invalid product id"
+        // );
+        return _product.productId == _productId ? _product : Product(0,0,0,0,"",0);
     }
 
     

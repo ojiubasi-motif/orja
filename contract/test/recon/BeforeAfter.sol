@@ -14,6 +14,14 @@ abstract contract BeforeAfter is Setup {
     address[] internal _registeredActors;
     mapping(address => uint256) internal _actorIndex;
 
+    enum OpType {
+        ADD,
+        EDIT,
+        REG
+    }
+
+    OpType internal currentOperation;
+
     Vars internal _before;
     Vars internal _after;
     // user data ghosts
@@ -28,6 +36,13 @@ abstract contract BeforeAfter is Setup {
         __before();
         _;
         __after();
+    }
+
+    modifier updateGhostsWithOp(OpType op, uint256 id) {
+        currentOperation = op;
+        __productBefore(id);
+        _;
+        __productAfter(id);
     }
 
     modifier userUpdateGhosts(address userAddr) {

@@ -119,12 +119,12 @@ abstract contract Base is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         // CommonLib.User memory userData = getUserData(_account);
         require(
             _user.account != address(0) && _user.account == msg.sender,
-            "unauthorized address not allowed to list product"
+            "unauthorized address not allowed to list/update product"
         );
         require(
             // _user._userType == UserType.Seller &&
                 _user.verificationStatus == VerificationStatus.Verified,
-            "only verified sellers can list products"
+            "only verified sellers can list/update products"
         );
     }
 
