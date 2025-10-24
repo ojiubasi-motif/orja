@@ -14,15 +14,15 @@ abstract contract ERC20Base {
         address _from,
         address _to,
         uint256 _amount
-    ) internal {
-        _token.safeTransferFrom(_from, _to, _amount);
+    ) internal returns (bool) {
+        return _token.trySafeTransferFrom(_from, _to, _amount);
     }
 
     function safeWithdrawFromEscrow(
         IERC20 _token,
         address _to,
         uint256 _amount
-    ) internal {
-        _token.safeTransfer(_to,_amount);
+    ) internal returns (bool) {
+        return _token.trySafeTransfer(_to, _amount);
     }
 }

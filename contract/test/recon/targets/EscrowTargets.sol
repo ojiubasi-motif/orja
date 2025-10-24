@@ -62,7 +62,7 @@ abstract contract EscrowTargets is BaseTargetFunctions, Properties {
         string memory _paymentTokenSymbol,
         uint256 _payRef
     ) public asActor {
-        escrow.payForItemsWithUsd(_userId, bill, _paymentTokenSymbol, _payRef);
+        // escrow.payForItemsWithUsd(_userId, bill, _paymentTokenSymbol, _payRef);
     }
 
     // function escrow_renounceOwnership() public asActor {

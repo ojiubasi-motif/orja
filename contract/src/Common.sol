@@ -15,7 +15,10 @@ enum VerificationStatus {
     Verified,
     Processing
 }
-
+struct OrderSpec {
+    uint256 prodId;
+    uint8 qty;
+}
 struct User {
     uint256 userId;
     string lastName;
@@ -72,7 +75,7 @@ struct Category {
 
 abstract contract Base is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     //@test======for contract test on foundry local--
-    
+
     event WithdrawSuccess(
         uint256 indexed _userId,
         string _tokenSymbol,
@@ -123,7 +126,7 @@ abstract contract Base is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         );
         require(
             // _user._userType == UserType.Seller &&
-                _user.verificationStatus == VerificationStatus.Verified,
+            _user.verificationStatus == VerificationStatus.Verified,
             "only verified sellers can list/update products"
         );
     }

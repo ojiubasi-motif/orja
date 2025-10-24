@@ -5,15 +5,16 @@ pragma solidity ^0.8.13;
 import {IProduct,IUser} from "./interfaces/IEcomm.sol";
 import {Utils,ProductsUtils} from "./truss-lib/Utils.sol";
 import "./Common.sol";
+import  {Productsv1} from "./v1/Products.sol";
 
-contract Products is Base, IProduct {
-    IUser userInterface;
-    address userContract;
+contract Products is Productsv1 {
+    // IUser userInterface;
+    // address userContract;
 
      using ProductsUtils for Product[];
-    Product[] public products;
+    // Product[] public products;
 
-    mapping(uint256 => uint256) productIdToRecordIndex;
+    // mapping(uint256 => uint256) productIdToRecordIndex;
     
     constructor() // address _escrowAddress
     // address _feddAddr //  address _adminDaoAddress
@@ -21,13 +22,13 @@ contract Products is Base, IProduct {
         _disableInitializers();
     }
 
-    function initialize(
+    function initializev2(
         address _userContractAddress,
         address initialOwner
     )
         external
         // address _feedAddr //  address _adminDaoAddress
-        initializer
+        reinitializer(2)
     {
         __Ownable_init(initialOwner);
         __UUPSUpgradeable_init();
@@ -70,7 +71,7 @@ contract Products is Base, IProduct {
             whenToExpectDelivery: block.timestamp + _expectedDeliveryTime
         });
         products.push(newProductData);
-        productIdToRecordIndex[id] = products.length - 1;
+        productIdToRecordIndex[id] = products.length;
         emit ResgisteredAProduct(id, sellerData.userId);
         return id;
     }
@@ -83,9 +84,9 @@ contract Products is Base, IProduct {
         User memory userData = userInterface.getUserData(msg.sender);
         _isCallerSeller(userData);
         Product storage productData = products[
-            productIdToRecordIndex[_productId]
+            productIdToRecordIndex[_productId] - 1
         ];
-        require(productData.productId != 0 && productData.productId == _productId, "Product not found");
+        require(productData.productId == _productId, "Product not found");
         require(
             userData.userId == productData.sellerId,
             "you're not the product owner"
@@ -93,7 +94,7 @@ contract Products is Base, IProduct {
         // require(productData.productId == _productId, "Product ID mismatch");
         require(_newPrice > 0, "New price must be greater than zero");
         productData.unitPrice = _newPrice; //price is in _protocol default decimal[USD_DECIMALS]
-        products[productIdToRecordIndex[_productId]] = productData;
+        products[productIdToRecordIndex[_productId] - 1] = productData;
         emit ProductpriceUpdate(_productId, userData.userId, _newPrice);
     }
 
@@ -101,12 +102,12 @@ contract Products is Base, IProduct {
         uint256 _productId
     ) external view override returns (Product memory) { 
         require(products.length > 0, "products array empty");
-        Product memory _product = products[productIdToRecordIndex[_productId]];
+        Product memory _product = products[productIdToRecordIndex[_productId] - 1];
         // require(
         //     _product.productId != 0 && _product.productId == _productId,
         //     "Invalid product id"
         // );
-        return _product.productId == _productId ? _product : Product(0,0,0,0,"",0);
+        return productIdToRecordIndex[_productId] == 0 ? Product(0,0,0,0,"",0) : _product;
     }
 
     

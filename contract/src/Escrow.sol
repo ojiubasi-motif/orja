@@ -11,52 +11,59 @@ pragma solidity ^0.8.0;
   product proxy: 0x1fa790Bf376013277B8Aa7506D330c417A1dc155
   Ecommerce Proxy: 0x09EB12CbCDa3E5ad65874bc54330782fa8d51DD9
   Escrow Proxy: 0x2163fee47139C909ad093e4E0eE22A119B5Df206
+  ===================v2 implementation=====================
+  User Manager Imp: 0x30440C5aF95d28F5c4E03186228a6328Fb8a3c09
+  product Impl: 0x67498A61A5aDF49B2EfE41f23Aec9EbfAA85776c
+  Ecommerce Impl: 0x8F01EcE5027fF19c18C7bafB843A7e89a60f079B
+  Escrow Impl: 0x86912C9Bc3F9569b14873BABe65DA20f6B1A9e61
 */
 
 import "./ERC20Base.sol";
 import "./Common.sol";
 import {IShop, IUser} from "@custom-interfaces/IEcomm.sol";
 import {IEcomEscrow} from "@custom-interfaces/IEscrow.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import "@chainlink/AggregatorV3Interface.sol";
 import "forge-std/console.sol";
+import {Escrowv1} from "./v1/Escrow.sol";
 
-contract Escrow is Base, ERC20Base {
-    mapping(string => bool) public isAccepted;
-    mapping(string => Token) public tokenSymbolToDetails;
-    string[] public acceptedTokens;
+contract Escrow is Escrowv1 {
+    // mapping(string => bool) public isAccepted;
+    // mapping(string => Token) public tokenSymbolToDetails;
+    // string[] public acceptedTokens;
 
-    bool isEcommAndUserManagerProxySet;
-    address public ecommercePlatform;
-    address public userContract;
+    // bool isEcommAndUserManagerProxySet;
+    // address public ecommercePlatform;
+    // address public userContract;
     // @test uncomment next line later in live deployment
-    AggregatorV3Interface priceFeed;
+    // AggregatorV3Interface priceFeed;
 
     // IERC20 erc20Interface;
 
-    IShop ecommInterface;
-    IUser userInterface;
+    // IShop ecommInterface;
+    // IUser userInterface;
 
-    mapping(uint256 _userId => mapping(uint256 _paymentRef => uint256 _balance))
-        private userBalance;
-    mapping(uint256 _paymentRef => string _symbol) public paymentRefToToken;
-    mapping(uint256 _paymentRef => uint256 _tokenPrice)
-        public tokenPriceAtcheckout;
+    // mapping(uint256 _userId => mapping(uint256 _paymentRef => uint256 _balance))
+    //     private userBalance;
+    // mapping(uint256 _paymentRef => string _symbol) public paymentRefToToken;
+    // mapping(uint256 _paymentRef => uint256 _tokenPrice)
+    //     public tokenPriceAtcheckout;
 
-    mapping(uint256 _userId => mapping(uint256 _paymentRef => uint256 _balance))
-        private withdrawableBalance;
-    mapping(uint256 _payref => mapping(uint256 _product => bool _cancel)) letBuyerCancel;
-    mapping(uint256 _payref => OrderItem[] _order) trxToCart;
+    // mapping(uint256 _userId => mapping(uint256 _paymentRef => uint256 _balance))
+    //     private withdrawableBalance;
+    // mapping(uint256 _payref => mapping(uint256 _product => bool _cancel)) letBuyerCancel;
+    // mapping(uint256 _payref => OrderItem[] _order) trxToCart;
 
-    constructor()  {
+    constructor() {
         _disableInitializers();
         // owner = msg.sender;
         // pricefeed = AggregatorV3Interface(_feedAddr);//remove before deployment to production
     }
 
-    function initialize(
+    function initializev2(
         address _userContractAddress,
         address initialOwner
-    ) external  initializer {
+    ) external reinitializer(2) {
         __Ownable_init(initialOwner);
         __UUPSUpgradeable_init();
 
@@ -85,7 +92,7 @@ contract Escrow is Base, ERC20Base {
         ecommercePlatform = _ecommercePlatform;
         ecommInterface = IShop(ecommercePlatform);
 
-           priceFeed = AggregatorV3Interface(ecommInterface.getFeed()); //@test uncomment next line later in live deployment
+        // priceFeed = AggregatorV3Interface(ecommInterface.getFeed()); //@test comment this line later in live deployment
         // userContract = _userContract;
     }
 
@@ -181,19 +188,25 @@ contract Escrow is Base, ERC20Base {
             .decode(_feedData, (string, uint8, int256));
         require(_tokenPrice > 0, "Invalid price fetched from feed");
 
-        uint EthvalueInUsd = (msg.value * uint(_tokenPrice)) / 1e18; // Assuming pricefeed returns price in 8 decimals
-        uint diff = EthvalueInUsd > _bill
-            ? EthvalueInUsd - _bill
-            : _bill - EthvalueInUsd;
-        require(
-            diff <= 10 ** (_decimal - 2), // 1e6(0.01USD) if decimal==8 etc...
-            "too much difference between payment and calculated checkout amount, try again"
+        (bool success, uint256 _ethVal) = Math.tryMul(
+            msg.value,
+            uint(_tokenPrice)
         );
+        require(success, "escrow overflow calculating eth value in usd");
+        uint EthvalueInUsd = Math.ceilDiv(_ethVal, 1e18); // Assuming pricefeed returns price in 8 decimals
+        require(EthvalueInUsd >= _bill, "Insufficient ETH sent for payment");
+        // uint diff = EthvalueInUsd >= _bill
+        //     ? EthvalueInUsd - _bill
+        //     : _bill - EthvalueInUsd;
+        // require(
+        //     diff <= 10 ** (_decimal - 2), // 1e6(0.01USD) if decimal==8 etc...
+        //     "too much difference between payment and calculated checkout amount, try again"
+        // );
         require(
             userBalance[_userId][_payRef] == 0,
             "Payment has already been made with this reference"
         );
-        trxToCart[_payRef] = ecommInterface.getCart(_userId);
+        trxToCart[_payRef] = ecommInterface.getOrder(_userId, _payRef);
         // Logic to handle payment
         userBalance[_userId][_payRef] += msg.value;
         paymentRefToToken[_payRef] = _symbol;
@@ -204,44 +217,76 @@ contract Escrow is Base, ERC20Base {
         return (true, _payRef);
     }
 
-    function payForItemsWithUsd(
+    function payForItemsWithERC20(
         uint _userId,
-        uint bill,
+        uint _checkoutAmount,
+        uint _tokenAmountSent,
         string memory _paymentTokenSymbol,
-        uint _payRef
+        uint _payRef,
+        bytes memory _feedData
     ) external returns (bool, uint) {
         require(
             msg.sender == ecommercePlatform,
             "only ecommerce contract can interract with this function"
         );
+
         // require(msg.value > 0, "Payment must be greater than zero");
         // @test uncomment next line b4 live deploy
         // priceFeed = AggregatorV3Interface(
         //     tokenSymbolToDetails[_paymentTokenSymbol].feedAddr
         // );
-        uint8 UsdDecimals = priceFeed.decimals();
+        // uint8 UsdDecimals = priceFeed.decimals();
+        // (
+        //     ,
+        //     /* uint80 roundId */ int256 tokenPrice /*uint256 startedAt*/ /*uint256 updatedAt*/ /*uint80 answeredInRound*/,
+        //     ,
+        //     ,
+
+        // ) = priceFeed.latestRoundData();
+        // require(tokenPrice > 0, "Invalid price fetched from feed");
+        // @test the next two commands are for local tests
         (
-            ,
-            /* uint80 roundId */ int256 tokenPrice /*uint256 startedAt*/ /*uint256 updatedAt*/ /*uint80 answeredInRound*/,
-            ,
-            ,
-
-        ) = priceFeed.latestRoundData();
-        require(tokenPrice > 0, "Invalid price fetched from feed");
-
-        uint256 allowedDiff = 10 ** (UsdDecimals - 3); //i.e 0.001 USDT, USDC, BUSD
-        uint256 diff = UsdDecimals - uint256(tokenPrice); //ideally usd ==> decimals * 1, i.e 1usdt = $1
+            string memory _symbol,
+            uint8 _decimal,
+            int256 _tokenPrice,
+            address _tokenAddr
+        ) = abi.decode(_feedData, (string, uint8, int256, address));
+        require(_tokenPrice > 0, "Invalid price fetched from feed");
         require(
-            diff <= allowedDiff,
-            "sorry, onchain value of USD is too low at this time, please try again or use Eth to pay"
+            tokenSymbolToDetails[_paymentTokenSymbol].tokenAddr == _tokenAddr,
+            "mismatched token symbol and address"
         );
+        erc20 = IERC20(tokenSymbolToDetails[_paymentTokenSymbol].tokenAddr);
+        require(erc20.decimals() > 0, "Invalid token decimals");
+        (bool success, uint256 _tokenVal) = Math.tryMul(
+            _tokenAmountSent,
+            uint(_tokenPrice)
+        );
+        require(
+            success,
+            "escrow overflow calculating token value sent in feedprice"
+        );
+        uint tokenValueInUsd = Math.ceilDiv(_tokenVal, 10 ** erc20.decimals()); // Assuming pricefeed returns price in 8 decimals
+        require(
+            tokenValueInUsd >= _checkoutAmount,
+            "Insufficient token sent for payment"
+        );
+        // uint diff = tokenValueInUsd >= _checkoutAmount
+        //     ? tokenValueInUsd - _checkoutAmount
+        //     : _checkoutAmount - tokenValueInUsd;
+        // uint256 allowedDiff = 10 ** (_decimal - 3); //i.e 0.001 for stablecoins like USDT, USDC, BUSD
+        // uint256 diff = _decimal - uint256(_tokenPrice); //ideally usd ==> decimals * 1, i.e 1usdt = $1
+        // require(
+        //     diff <= 10 ** (_decimal - 3),//i.e 0.001 for stablecoins like USDT, USDC, BUSD
+        //     "sorry, onchain value of USD is too low at this time, please try again or use Eth to pay"
+        // );
         require(
             userBalance[_userId][_payRef] == 0,
             "Payment has already been made with this reference"
         );
-        trxToCart[_payRef] = ecommInterface.getCart(_userId);
+        trxToCart[_payRef] = ecommInterface.getOrder(_userId, _payRef);
         // Logic to handle payment
-        userBalance[_userId][_payRef] += bill;
+        userBalance[_userId][_payRef] += _checkoutAmount;
         paymentRefToToken[_payRef] = _paymentTokenSymbol;
         // For example, transfer funds to the seller
         // and emit an event for the transaction
@@ -300,8 +345,11 @@ contract Escrow is Base, ERC20Base {
         // !!!! define a library for enums...
         User memory buyer = userInterface.getUserData(msg.sender);
         require(msg.sender == buyer.account, "unathorized caller");
-        OrderItem[] memory allCartItems = ecommInterface.getCart(buyer.userId);
-
+        OrderItem[] memory allCartItems = ecommInterface.getOrder(
+            buyer.userId,
+            _payRef
+        );
+        require(allCartItems.length > 0, "no order found for this");
         // Logic to update delivery status
         for (uint i = 0; i < allCartItems.length; i++) {
             if (allCartItems[i].productId == _productId) {
@@ -341,7 +389,7 @@ contract Escrow is Base, ERC20Base {
 
                     withdrawableBalance[allCartItems[i].sellerId][
                         _payRef
-                    ] += _balAfterFee; // add it to the seller withdrawable balance after deducting truss fee
+                    ] += _balAfterFee; // add _balAfterFee to the seller withdrawable balance after deducting truss fee
                 } else {
                     require(
                         allCartItems[i]._proposedDeliveryTime + 60 seconds <
@@ -352,7 +400,7 @@ contract Escrow is Base, ERC20Base {
                     //seller could not deliver
                     allCartItems[i].orderStatus = OrderStatus.Canceled;
                     userBalance[buyer.userId][_payRef] -= _bal; //remove from balance of the buyer
-                    withdrawableBalance[buyer.userId][_payRef] += _balAfterFee; //add to buyer withdrawable balance
+                    withdrawableBalance[buyer.userId][_payRef] += _bal; //add _bal(not _balAfterFee) to buyer withdrawable balance since sale was not a success
                     // emit DeliveryPending(_userId, _payRef);
                 }
                 emit ProductOrderStatusUpdated(
@@ -365,7 +413,7 @@ contract Escrow is Base, ERC20Base {
             } else
                 require(
                     i != allCartItems.length - 1, //last item has been searched and product not found
-                    "Product not found in cart"
+                    "Product not found in order"
                 );
         }
         // @dev calculate the coin equivalence if payment token isn't a stable coin

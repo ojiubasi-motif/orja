@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 import "@chainlink/AggregatorV3Interface.sol";
 import {Product, OrderItem} from "../Common.sol";
 import "forge-std/console.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {IProduct as ProductContract} from "../interfaces/IEcomm.sol";
 
@@ -27,6 +28,27 @@ library Utils {
     //     }
     //     return cumm;
     // }
+    
+    function previewCheckoutBill(OrderItem[] memory _order) public pure returns (uint256) {
+        // Product memory productData;
+        uint256 cumm = 0;
+        for (uint256 i = 0; i < _order.length; ++i) {
+           
+            if (_order[i].sellerId == 0) {
+                continue; // skip if product seller is not valid
+            }
+            (bool _resp, uint256 _cost) = Math.tryMul(
+                _order[i].unitPrice,
+                _order[i].qty
+            );
+            require(_resp, "overflow calculating product cost, reduce the qty of some items");
+            // int8 quantity = userToproductQtyInCart[userData.userId][productId];
+            (bool _cummRes, uint256 answr) = Math.tryAdd(cumm, _cost);
+            require(_cummRes, "overflow calculating aggregated cost");
+            cumm = answr;
+        }
+        return cumm;
+    }
 
     function _scaleToPrecision(
         int256 _value,
@@ -34,13 +56,19 @@ library Utils {
         uint8 _desiredDecimals
     ) internal pure returns (int256) {
         if (_defaultDecimals < _desiredDecimals) {
-            return
-                _value *
-                int256(10 ** uint256(_desiredDecimals - _defaultDecimals));
+            (bool success, uint256 scaledValue) = Math.tryMul(
+                uint256(_value),
+                10 ** uint256(_desiredDecimals - _defaultDecimals)
+            );
+            require(success, "Multiplication overflow in scaling to precision");
+            return int256(scaledValue);
+                // _value *
+                // int256(10 ** uint256(_desiredDecimals - _defaultDecimals));
         } else if (_defaultDecimals > _desiredDecimals) {
             return
-                _value /
-                int256(10 ** uint256(_defaultDecimals - _desiredDecimals));
+            int256(Math.ceilDiv(uint256(_value), 10 ** uint256(_defaultDecimals - _desiredDecimals)));
+                // _value /
+                // int256(10 ** uint256(_defaultDecimals - _desiredDecimals));
         }
         return _value; //if _desiredDecimals == _defaultDecimals
     }
@@ -84,7 +112,16 @@ library Utils {
         // console.log("feeddecimal sh==>", _feedDecimals);
         bytes memory feedData = abi.encode("ETH", _feedDecimals, feedAnswer);
 
-        return ((_totalBill * 1e18) / uint256(feedAnswer), feedData); //return the equivalent amount of eth in wei
+        (bool success, uint256 scaledTotalBill) = Math.tryMul(
+            _totalBill,
+            1e18
+        );
+        require(success, "overflow calculating totalBill in eth equivalence");
+
+        return (Math.ceilDiv(scaledTotalBill, uint256(feedAnswer)), feedData); //return the equivalent amount of token in its smallest unit
+        // }
+
+        // return ((_totalBill * 1e18) / uint256(feedAnswer), feedData); //return the equivalent amount of eth in wei
     }
 
     function _getTokenEquivalence(
@@ -101,7 +138,7 @@ library Utils {
             "Invalid feed decimals fetched from price feed"
         );
         // else {
-        uint tokenPrecision;
+        uint256 tokenPrecision;
         (, bytes memory _returned) = tokenAddr.call(
             abi.encodeWithSignature("decimals()")
         );
@@ -123,10 +160,16 @@ library Utils {
         bytes memory feedData = abi.encode(
             _tokenSymbol,
             _feedDecimals,
-            feedAnswer
+            feedAnswer,
+            tokenAddr
         );
+        (bool success, uint256 scaledTotalBill) = Math.tryMul(
+            _totalBill,
+            tokenPrecision
+        );
+        require(success, "overflow calculating totalBill in token equivalence");
 
-        return ((_totalBill * tokenPrecision) / uint256(feedAnswer), feedData); //return the equivalent amount of token in its smallest unit
+        return (Math.ceilDiv(scaledTotalBill, uint256(feedAnswer)), feedData); //return the equivalent amount of token in its smallest unit
         // }
     }
 }

@@ -2,15 +2,16 @@
 pragma solidity ^0.8.0;
 
 import "./Common.sol";
+import { TrussUserv1 } from "@src/v1/User.sol"; 
 
-contract TrussUser is Base {
-    mapping(address => bool) private isRegistered; //is acc is registered
-    mapping(address => bool) private isVerified; //is acc verified?
-    mapping(address => uint256) private userToRecordIndex;
+contract TrussUser is TrussUserv1 {
+    // mapping(address => bool) private isRegistered; //is acc is registered
+    // mapping(address => bool) private isVerified; //is acc verified?
+    
 
     // address payable escrowContract;
 
-    User[] users;
+    // User[] users;
 
     constructor() // address _escrowAddress
     // address _feddAddr //  address _adminDaoAddress
@@ -18,13 +19,13 @@ contract TrussUser is Base {
         _disableInitializers();
     }
 
-    function initialize(
+    function initializev2(
         // address _escrowAddress,
         address initialOwner
     )
         external
         // address _feedAddr //  address _adminDaoAddress
-        initializer
+        reinitializer(3)
     {
         __Ownable_init(initialOwner);
         __UUPSUpgradeable_init();

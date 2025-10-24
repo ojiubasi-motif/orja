@@ -11,6 +11,9 @@ import {Escrow} from "../src/Escrow.sol";
 import {TrussUser} from "../src/User.sol";
 import {Products} from "../src/Products.sol";
 import {MockV3Aggregator} from "./Mocks.sol";
+import {Utils} from "../src/truss-lib/Utils.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+
 
 // import {OrderLib} from "@library/OrderManager.sol";
 
@@ -71,8 +74,8 @@ contract EcommTest is Test {
                 address(escrow),
                 address(userManager),
                 address(productManager),
-                deployer
-                // address(priceFeed) //@test remove the address(priceFeed) b4 live deploy
+                deployer,
+                address(priceFeed) //@test remove the address(priceFeed) b4 live deploy
             )
         );
         // ======3=======
@@ -178,14 +181,16 @@ contract EcommTest is Test {
 
         Product[] memory products = productProxy.getProducts(0, 2);
 
-        trussProxy.addProductToCart(products[0].productId, 2);
-        trussProxy.addProductToCart(products[1].productId, 6);
+        // trussProxy.addProductToCart(products[0].productId, 2);
+        // trussProxy.addProductToCart(products[1].productId, 6);
 
         _escrowBalB4 = address(escrowProxy).balance;
         //step1= Start recording logs
         vm.recordLogs();
-
-        trussProxy.checkOutWithNative{value: 2 ether}("ETH");
+        OrderSpec[] memory _order = new OrderSpec[](2);
+        _order[0] = OrderSpec({prodId: products[0].productId, qty: 2});
+        _order[1] = OrderSpec({prodId: products[1].productId, qty: 6});
+        trussProxy.checkOutWithNative{value: 2 ether}(_order,"ETH");
         //step2= Fetch recorded logs
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
@@ -219,9 +224,20 @@ contract EcommTest is Test {
             uint256 buyer1Id
         ) = shop();
         uint escrowBalAfter = address(escrowProxy).balance;
-        vm.prank(address(escrowProxy));
+        vm.startPrank(address(escrowProxy));
         uint userEscrowBal = escrowProxy.getWalletBalance(buyer1Id, _payref);
-        assertEq(_symbol, "ETH");
+        OrderItem[] memory order = trussProxy.getOrder(buyer1Id, _payref);
+        vm.stopPrank();
+        uint256 _bill = Utils.previewCheckoutBill(order);
+        (, int256 _tokenPrice,,,)= priceFeed.latestRoundData();
+        (bool success, uint256 _ethVal) = Math.tryMul(
+            amount,
+            uint(_tokenPrice)
+        );
+        require(success, "escrow overflow calculating eth value in usd");
+        uint EthvalueInUsd = Math.ceilDiv(_ethVal, 1e18);
+        assertGe(EthvalueInUsd, _bill);
+        // assertEq(_symbol, "ETH");
         assertEq(amount, userEscrowBal);
         assertEq(escrowBalAfter, escrowBalB4 + userEscrowBal);
     }
@@ -250,7 +266,7 @@ contract EcommTest is Test {
         uint escrowBalB4Withdraw = address(escrowProxy).balance;
 
         vm.startPrank(buyer1);
-        OrderItem[] memory cartItems = trussProxy.getCart(buyer1Id);
+        OrderItem[] memory cartItems = trussProxy.getOrder(buyer1Id, _payref);
         vm.warp(block.timestamp + 7 days + 61 seconds); //fast forward time by 7 days + 61 seconds==there's grace of 60secs in the contract
         updateDeliveryStatus(cartItems[0].productId, _payref, true);
         updateDeliveryStatus(cartItems[1].productId, _payref, false);
@@ -281,6 +297,7 @@ contract EcommTest is Test {
 
         assertEq(buyer1.balance, balB4 + userWithdrawableBalB4);
         // assertEq(userEscrowBalAfter, 0);
+        vm.prank(seller1);
         assertEq(escrowProxy.getWalletBalance(seller1Id, _payref), 0);
         assertEq(escrowBalAfterWithdraw + (buyer1.balance - balB4) + (seller1.balance - sellerBalB4),  amount);
     }

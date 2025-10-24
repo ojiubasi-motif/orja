@@ -7,10 +7,11 @@ interface IShop {
    
     // function userCheckoutAmount(uint256 _payRef) external view returns (uint256);
     // @test remove later
-   function getFeed() external view returns (address);
+//    function getFeed() external view returns (address);
 
-    function getCart(
-        uint256 _user
+    function getOrder(
+        uint256 _user,
+        uint256 _payRef
     ) external view returns (OrderItem[] memory);
     // @dev=NB: public mappings are by default getter functions so no need to define exclusive getters for them
     // function tokenSymbolToDetails(

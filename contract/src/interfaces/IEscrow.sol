@@ -5,7 +5,7 @@ import {Token} from "../Common.sol";
 
 interface IEcomEscrow  {
     function payForItemsWithETH(uint _userId,uint _bill, bytes memory _feedData, uint _payRef) external payable returns (bool, uint);
-    function payForItemsWithUsd(uint _userId,uint _bill, string memory _paymentTokenSymbol, uint _payRef) external returns (bool, uint);
+    function payForItemsWithERC20(uint _userId,uint _bill,uint _tokenAmountSent, string memory _paymentTokenSymbol, uint _payRef, bytes memory _feedData) external returns (bool, uint);
     function updateDeliveryStatus(
         uint _payRef,
         uint _productId,

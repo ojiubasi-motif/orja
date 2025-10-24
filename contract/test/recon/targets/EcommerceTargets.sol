@@ -22,15 +22,15 @@ abstract contract EcommerceTargets is
     /// AUTO GENERATED TARGET FUNCTIONS - WARNING: DO NOT DELETE OR MODIFY THIS LINE ///
 
     function ecommerce_addProductToCart(uint256 _productId, uint32 _qty) public asActor {
-        ecommerce.addProductToCart(_productId, _qty);
+        // ecommerce.addProductToCart(_productId, _qty);
     }
 
     function ecommerce_checkOutWithNative(string memory _payToken) public payable asActor {
-        ecommerce.checkOutWithNative{value: msg.value}(_payToken);
+        // ecommerce.checkOutWithNative{value: msg.value}(_payToken);
     }
 
     function ecommerce_checkOutWithUSD(string memory _payToken) public asActor {
-        ecommerce.checkOutWithUSD(_payToken);
+        // ecommerce.checkOutWithUSD(_payToken);
     }
 
     // function ecommerce_initialize(address _escrowAddress, address _userContract, address _productContract, address initialOwner) public asActor {
