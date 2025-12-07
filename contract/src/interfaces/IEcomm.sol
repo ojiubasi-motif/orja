@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-import "../Common.sol";
+import "@src/Common.sol";
 
 pragma solidity >=0.8.26;
  
@@ -44,6 +44,9 @@ interface IProduct{
      function getProductData(
         uint256 _productId
     ) external view  returns (Product memory);
+    function isProductListed(
+        uint256 _productId
+    ) external view returns (bool);
     //  function getProductData(
     //     uint256 _productId
     // ) external view returns (Product memory);

@@ -28,8 +28,9 @@ struct User {
     VerificationStatus verificationStatus;
 }
 enum OrderStatus {
+    None,
     Processing,
-    InDisput,
+    InDispute,
     Delivered,
     Canceled,
     Settled

@@ -16,21 +16,22 @@ import { EscrowTargets } from "./targets/EscrowTargets.sol";
 import { ManagersTargets } from "./targets/ManagersTargets.sol";
 import { ProductsTargets } from "./targets/ProductsTargets.sol";
 import { TrussUserTargets } from "./targets/TrussUserTargets.sol";
-// @me add more imports here
-import {PriceFeedTargets} from "./targets/PriceFeedTargets.sol";
 
 abstract contract TargetFunctions is
     AdminTargets,
     DoomsdayTargets,
-    // EcommerceTargets,
-    // EscrowTargets,
+    EcommerceTargets,
+    EscrowTargets,
     ManagersTargets,
     ProductsTargets,
-    TrussUserTargets,
-    PriceFeedTargets
+    TrussUserTargets
 {
     /// CUSTOM TARGET FUNCTIONS - Add your own target functions here ///
-
+    function feed_setAnswer(int256 _price) public {
+        // Set a new answer for the price feed
+        int256 newPrice = between(_price, 5000, type(int256).max);
+        ETHfeed.setAnswer(newPrice);
+    }
 
     /// AUTO GENERATED TARGET FUNCTIONS - WARNING: DO NOT DELETE OR MODIFY THIS LINE ///
 }

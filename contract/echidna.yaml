@@ -1,9 +1,13 @@
-testMode: "assertion"
+testMode: "exploration"
 prefix: "echidna_"
 coverage: true
 corpusDir: "echidna"
-balanceAddr: 0x1043561a8829300000
-balanceContract: 0x1043561a8829300000
+# balanceAddr: 10000000000000000000000
+# balanceContract: 10000000000000000000000
+# ETH handling settings
+balanceAddr: 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+balanceContract: 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+maxValue: 10000000000000000000000
 # filterBlacklist: false
 # filterFunctions: ["CryticTester.getProductData(uint256)", "CryticTester.getProducts(uint256,uint256)", "CryticTester.getUserData(address)", 
 #                 "CryticTester.register(string,string)", "CryticTester.trussUser_onlyAdminCanVerify(address)", "CryticTester.trussUser_register()", 
@@ -19,11 +23,13 @@ filterFunctions: ["CryticTester.renounceOwnership()", "CryticTester.transferOwne
                   "CryticTester.renounceOwnership()", "CryticTester.transferOwnership(address)","CryticTester.initialize(address,address,address,address)",
                    "CryticTester.initialize(address)","CryticTester.initialize(address,address)",
                    "CryticTester.initialize(address,address)","CryticTester._transferOwnership(address)"]
+# deployContracts: [["0x1f","Utils"]]
 
-cryticArgs: ["--foundry-compile-all"]
+# cryticArgs: ["--foundry-compile-all"]
+slither: false 
 deployer: "0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38"
 contractAddr: "0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496"
 # shrinkLimit: 50000
 # testGasLimit: 8000000
-testLimit: 50000
-seqLength: 40
+testLimit: 10000
+seqLength: 50

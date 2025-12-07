@@ -2,28 +2,37 @@
 pragma solidity >=0.8.26;
 
 import "@custom-interfaces/IEscrow.sol";
-import "./Common.sol";
-import "./ERC20Base.sol";
+import "@src/Common.sol";
+// import {OrderItem} from  "@src/Common.sol";
+import "@src/ERC20Base.sol";
 import "@chainlink/AggregatorV3Interface.sol";
-import {IUser, IShop, IProduct} from "./interfaces/IEcomm.sol";
-import {Utils, ProductsUtils} from "./truss-lib/Utils.sol";
+import {IUser, IShop, IProduct} from "@src/interfaces/IEcomm.sol";
+import {Utils, ProductsUtils} from "@src/truss-lib/Utils.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import "forge-std/console.sol";
-import {Ecommercev1} from "./v1/Ecomm.sol";
 
 // import "forge-std/console.sol";
 
-contract Ecommerce is Ecommercev1 {
-    // IEcomEscrow escrowInterface;
-    // IUser userInterface;
-    // IProduct productInterface;
-    // @test======for contract test on foundry local---
-    // AggregatorV3Interface internal priceFeed;
+contract Ecommerce is IShop, Base, ERC20Base {
+    IEcomEscrow escrowInterface;
+    IUser userInterface;
+    IProduct productInterface;
 
-    // struct OrderSpec {
-    //     uint256 prodId;
-    //     uint8 qty;
-    // }
+    bytes32 private constant ECOMM_STORAGE_SLOT = keccak256("erc7575.ecomm.storage");
+
+
+    uint constant USD_PRECISION = 1e8; //
+    uint8 constant USD_DECIMALS = 8;
+
+    struct EcommStorage {
+        address payable escrowContract;
+        address userContract;
+        address productContract;
+        mapping(uint256 _payRef => mapping(string _token => uint256 _checkoutRate)) checkoutTokenRate;
+        mapping(uint256 _paymentReference => uint256 _amount) _checkoutAmount;
+        mapping(uint256 _buyerId => mapping(uint256 _payRef => OrderItem[] _products)) order;
+        uint256 _refCounter;
+    }
 
     // address payable escrowContract;
     // address userContract;
@@ -40,23 +49,51 @@ contract Ecommerce is Ecommercev1 {
 
     // mapping(uint256 _paymentReference => uint256 _amount)
     //     private _checkoutAmount;
-    mapping(uint256 _buyerId => mapping(uint256 _payRef => OrderItem[] _products)) private order;
     
 
     constructor() // address _escrowAddress
     // address _feddAddr //  address _adminDaoAddress
     {
         _disableInitializers();
-        // require(msg.sender != address(0), "invalid owner address");
-        // owner = msg.sender;
-        // require(
-        //     _escrowAddress != address(0) && msg.sender == owner,
-        //     "Invalid ESCROW address and/or unauthorized contract owner"
-        // );
-        // escrowContract = payable(_escrowAddress);
-        // // priceFeed = AggregatorV3Interface(_feddAddr);
-        // escrowInterface = IEcomEscrow(address(escrowContract));
-        // adminDAOcontract = _adminDaoAddress;
+    }
+
+    // function initializev2(
+    //     address _escrowAddress,
+    //     address _userContract,
+    //     address _productContract,
+    //     address initialOwner
+    //     address _feedAddr // @test uncomment next line later in live deployment
+    // )
+    //     external
+    //     // address _feedAddr //  address _adminDaoAddress
+    //     reinitializer(2)
+    //     // override
+    // {
+    //     __Ownable_init(initialOwner);
+    //     __UUPSUpgradeable_init();
+    //     require(_escrowAddress != address(0), "Invalid ESCROW address");
+    //     require(_userContract != address(0), "Invalid user contract address");
+    //     require(
+    //         _productContract != address(0),
+    //         "Invalid product contract address"
+    //     );
+
+    //     escrowContract = payable(_escrowAddress);
+    //     userContract = _userContract;
+    //     productContract = _productContract;
+    //     // @test======remove later local---
+    //     // priceFeed = AggregatorV3Interface(_feedAddr);
+    //     escrowInterface = IEcomEscrow(address(escrowContract));
+    //     userInterface = IUser(address(userContract));
+    //     productInterface = IProduct(address(productContract));
+    //     // adminDAOcontract = _adminDaoAddress;
+    // }
+    // @dep --remove dis fnc
+    function _getEcommStorage() private pure returns(EcommStorage storage $) {
+         bytes32 slot = ECOMM_STORAGE_SLOT;
+        assembly {
+            $.slot := slot
+        }
     }
 
     function initializev2(
@@ -64,12 +101,11 @@ contract Ecommerce is Ecommercev1 {
         address _userContract,
         address _productContract,
         address initialOwner
-        // address _feedAddr // @test uncomment next line later in live deployment
     )
         external
-        // address _feedAddr //  address _adminDaoAddress
-        reinitializer(2)
-        // override
+        reinitializer(4)
+
+        // initializer
     {
         __Ownable_init(initialOwner);
         __UUPSUpgradeable_init();
@@ -80,14 +116,16 @@ contract Ecommerce is Ecommercev1 {
             "Invalid product contract address"
         );
 
-        escrowContract = payable(_escrowAddress);
-        userContract = _userContract;
-        productContract = _productContract;
+        EcommStorage storage $ = _getEcommStorage();
+
+        $.escrowContract = payable(_escrowAddress);
+        $.userContract = _userContract;
+        $.productContract = _productContract;
         // @test======remove later local---
         // priceFeed = AggregatorV3Interface(_feedAddr);
-        escrowInterface = IEcomEscrow(address(escrowContract));
-        userInterface = IUser(address(userContract));
-        productInterface = IProduct(address(productContract));
+        escrowInterface = IEcomEscrow(address($.escrowContract));
+        userInterface = IUser(address($.userContract));
+        productInterface = IProduct(address($.productContract));
         // adminDAOcontract = _adminDaoAddress;
     }
 
@@ -105,14 +143,17 @@ contract Ecommerce is Ecommercev1 {
         external
         view
         override
-        // onlyAuthorizedBuyerOrEscrow(
-        //     userInterface.getUserData(msg.sender).account,
-        //     escrowContract
-        // )
-        returns (OrderItem[] memory)
+        returns (
+            // onlyAuthorizedBuyerOrEscrow(
+            //     userInterface.getUserData(msg.sender).account,
+            //     escrowContract
+            // )
+            OrderItem[] memory
+        )
     {
+        EcommStorage storage $ = _getEcommStorage();
         // User memory userData = userInterface.getUserData(_account);
-        OrderItem[] memory cartItems = order[_userId][_payRef];
+        OrderItem[] memory cartItems = $.order[_userId][_payRef];
         require(cartItems.length > 0, "Order is empty");
         return cartItems;
     }
@@ -129,34 +170,42 @@ contract Ecommerce is Ecommercev1 {
         uint32 _qty
     )
         private
-        // override
-        // address _account
-        // onlyAuthorizedBuyerOrEscrow(
-        //     userInterface.getUserData(msg.sender).account,
-        //     escrowContract
-        // )
         view
-        returns (OrderItem memory)
+        returns (
+            // override
+            // address _account
+            // onlyAuthorizedBuyerOrEscrow(
+            //     userInterface.getUserData(msg.sender).account,
+            //     escrowContract
+            // )
+            OrderItem memory
+        )
     {
         Product memory product = productInterface.getProductData(_productId);
-        return OrderItem({
-            sellerId: product.sellerId,
-            productId: product.productId,
-            qty: _qty,
-            unitPrice: product.unitPrice,
-            orderStatus: OrderStatus.Processing,
-            _proposedDeliveryTime: product.whenToExpectDelivery // in miliseconds
-        });
-    //    return item;
+        // require(product.sellerId != 0, "product seller not valid");
+        if (product.sellerId != 0) {
+            return
+                OrderItem({
+                    sellerId: product.sellerId,
+                    productId: product.productId,
+                    qty: _qty,
+                    unitPrice: product.unitPrice,
+                    orderStatus: OrderStatus.Processing,
+                    _proposedDeliveryTime: product.whenToExpectDelivery // in miliseconds
+                });
+        }
+
+        //    return item;
         // calculateUserBill(user.userId); // calculate the total bill for the user
         // userToproductQtyInCart[user.userId][product.productId] = _qty;
     }
 
-     function previewCheckoutBill(OrderItem[] memory _order) public pure returns (uint256) {
+    function previewCheckoutBill(
+        OrderItem[] memory _order
+    ) public pure returns (uint256) {
         // Product memory productData;
         uint256 cumm = 0;
         for (uint256 i = 0; i < _order.length; ++i) {
-           
             if (_order[i].sellerId == 0) {
                 continue; // skip if product seller is not valid
             }
@@ -164,7 +213,10 @@ contract Ecommerce is Ecommercev1 {
                 _order[i].unitPrice,
                 _order[i].qty
             );
-            require(_resp, "overflow calculating product cost, reduce the qty of some items");
+            require(
+                _resp,
+                "overflow calculating product cost, reduce the qty of some items"
+            );
             // int8 quantity = userToproductQtyInCart[userData.userId][productId];
             (bool _cummRes, uint256 answr) = Math.tryAdd(cumm, _cost);
             require(_cummRes, "overflow calculating aggregated cost");
@@ -175,97 +227,128 @@ contract Ecommerce is Ecommercev1 {
 
     // @dig is there a need to add-to-cart when checkout isn't assured? make it private
     // @dig zk tech could be used to augment this process too.
-    function calculateUserBill(uint256 _userId, uint256 _payRef) private returns (uint256) {
-        OrderItem[] memory cartItems = order[_userId][_payRef];
+    function calculateUserBill(
+        uint256 _userId,
+        uint256 _payRef
+    ) private returns (uint256) {
+        EcommStorage storage $ = _getEcommStorage();
+        OrderItem[] memory cartItems = $.order[_userId][_payRef];
         require(cartItems.length > 0, "Cart is empty for this user");
-        (uint256 cumm) = Utils.previewCheckoutBill(cartItems);
-        _checkoutAmount[_userId] = cumm;
+        uint256 cumm = previewCheckoutBill(cartItems);
+        $._checkoutAmount[_userId] = cumm;
 
-        return _checkoutAmount[_userId];
+        return $._checkoutAmount[_userId];
     }
 
-    function checkOutWithNative(
+    function checkOutWithETH(
         // address _account,
-        OrderSpec [] memory _order,
-        string memory _payToken
+        OrderSpec[] memory _order
     )
-        public
+        external
         payable
+        // string memory _payToken
         onlyAuthorizedBuyerOrEscrow(
             userInterface.getUserData(msg.sender).account,
-            escrowContract
+            _getEcommStorage().escrowContract
         )
-    // returns (bool _resp, uint _payref)
+        returns (bool _resp, uint _payref)
     {
-        _checkOutWithNative(_order, msg.sender, _payToken);
+        (_resp, _payref) = _checkOutWithETH(_order, msg.sender);
     }
 
     function previewCheckoutAmount(
         uint256 _total,
         string memory _paymentToken
-    ) public  returns (uint256) {
-        (uint256 _tokenVal, bytes memory _data) = _getTokenEquivalence(_total, _paymentToken);
+    ) public returns (uint256) {
+        (uint256 _tokenVal, bytes memory _data) = _getTokenEquivalence(
+            _total,
+            _paymentToken
+        );
         return _tokenVal;
     }
 
     function checkOutWithERC20(
         // address msg.sender,
-        OrderSpec [] memory _order,
+        OrderSpec[] memory _order,
         string memory _payToken
     )
         public
         onlyAuthorizedBuyerOrEscrow(
             userInterface.getUserData(msg.sender).account,
-            escrowContract
+            _getEcommStorage().escrowContract
         )
     {
-        _checkOutWithERC20(_order,msg.sender, _payToken);
+        _checkOutWithERC20(_order, msg.sender, _payToken);
     }
 
     // ======private and internal fns=============
 
     function _generatePaymentRefence(
         address _account
-    ) private view returns (uint64 ref) {
+    ) private returns (uint64 ref) {
         // @dig find a better way to generate random value
+        EcommStorage storage $ = _getEcommStorage();
+        $._refCounter++;
         ref = uint64(
             uint256(
                 keccak256(
                     abi.encodePacked(
+                        $._refCounter,
+                        block.prevrandao,
+                        blockhash(block.number - 1),
                         _account,
                         block.timestamp,
-                        userInterface.getUserData(_account).userId
-                        // userInterface.users[userInterface.userIdToRecordIndex[_account]].userId
+                        gasleft()
                     )
                 )
             )
         );
+        // ref = uint64(
+        //     uint256(
+        //         keccak256(
+        //             abi.encodePacked(
+        //                 _account,
+        //                 block.timestamp,
+        //                 userInterface.getUserData(_account).userId
+        //                 // userInterface.users[userInterface.userIdToRecordIndex[_account]].userId
+        //             )
+        //         )
+        //     )
+        // );
     }
 
-    function _checkOutWithNative(
-        OrderSpec [] memory _order,
-        address _account,
-        string memory _paymentTokenSymbol
-    ) private {
+    function _checkOutWithETH(
+        OrderSpec[] memory _order,
+        address _account
+    )
+        private
+        returns (
+            // string memory _paymentTokenSymbol
+            bool,
+            uint
+        )
+    {
+        EcommStorage storage $ = _getEcommStorage();
         User memory userData = userInterface.getUserData(_account);
         require(userData.account != address(0), "user account not found");
         // require(!isCartProcessed[userData.userId], "Cart already processed");
         // isCartProcessed[userData.userId] = true; // mark the cart as processed
 
-        
         uint256 paymentRef = _generatePaymentRefence(_account);
 
         for (uint i = 0; i < _order.length; i++) {
-            OrderItem memory _orderItem = addProductToCart(_order[i].prodId, _order[i].qty);
-            order[userData.userId][paymentRef].push(
-               _orderItem
+            if (!productInterface.isProductListed(_order[i].prodId)) {
+                continue; // skip if product is not listed; prevents reverts in addProductToCart()
+            }
+            OrderItem memory _orderItem = addProductToCart(
+                _order[i].prodId,
+                _order[i].qty
             );
+            $.order[userData.userId][paymentRef].push(_orderItem);
         }
         uint256 amountPayable = calculateUserBill(userData.userId, paymentRef);
         // order[userData.userId][paymentRef] = cart[userData.userId];
         // delete cart[userData.userId]; // clear the cart
-
-
         // _checkoutAmount[paymentRef] = amountPayable;
         // if (keccak256(bytes(_paymentTokenSymbol)) == keccak256(bytes("ETH"))) {
         (uint expectedEthValue, bytes memory feedData) = _getTokenEquivalence(
@@ -275,7 +358,7 @@ contract Ecommerce is Ecommercev1 {
 
         require(msg.value >= expectedEthValue, "insufficient amount of ETH");
 
-        _checkoutAmount[userData.userId] = 0;
+        $._checkoutAmount[userData.userId] = 0;
         // amountPayable = 0; // reset the amount payable after checkout
         // console.log("expectedEthValue==>", expectedEthValue);
         (bool payResponse, uint payRef) = escrowInterface.payForItemsWithETH{
@@ -286,31 +369,36 @@ contract Ecommerce is Ecommercev1 {
         emit SuccessfulCheckout(
             userData.userId,
             payRef,
-            _paymentTokenSymbol,
+            "ETH",
             expectedEthValue
         );
+        return (true, payRef);
     }
 
     function _checkOutWithERC20(
-         OrderSpec [] memory _order,
+        OrderSpec[] memory _order,
         address _account,
         string memory _paymentTokenSymbol
     ) private {
-       User memory userData = userInterface.getUserData(_account);
+        User memory userData = userInterface.getUserData(_account);
         require(userData.account != address(0), "user account not found");
         // require(!isCartProcessed[userData.userId], "Cart already processed");
         // isCartProcessed[userData.userId] = true; // mark the cart as processed
 
-        
         uint256 paymentRef = _generatePaymentRefence(_account);
+        EcommStorage storage $ = _getEcommStorage();
 
         for (uint i = 0; i < _order.length; i++) {
-            OrderItem memory _orderItem = addProductToCart(_order[i].prodId, _order[i].qty);
-            order[userData.userId][paymentRef].push(
-               _orderItem
+            OrderItem memory _orderItem = addProductToCart(
+                _order[i].prodId,
+                _order[i].qty
             );
+            $.order[userData.userId][paymentRef].push(_orderItem);
         }
-        uint256 amountPayableInUSD = calculateUserBill(userData.userId, paymentRef);
+        uint256 amountPayableInUSD = calculateUserBill(
+            userData.userId,
+            paymentRef
+        );
 
         require(
             escrowInterface.isAccepted(_paymentTokenSymbol),
@@ -349,10 +437,18 @@ contract Ecommerce is Ecommercev1 {
         //     msg.value >= expectedUSDValue,
         //     "insufficient amount of ETH"
         // );
-        _checkoutAmount[userData.userId] = 0; //clear checkoutamount
+        $._checkoutAmount[userData.userId] = 0; //clear checkoutamount
         // @dev use safetransferfrom, this will revert if not succesful(especially for weird erc20), since it does low-level call under the hood
-        require(escrowContract != address(0), "invalid escrow contract address");
-        bool _resp = safeDepositToEscrow(erc20, msg.sender, escrowContract, expectedTokenValue);
+        require(
+            $.escrowContract != address(0),
+            "invalid escrow contract address"
+        );
+        bool _resp = safeDepositToEscrow(
+            erc20,
+            msg.sender,
+            $.escrowContract,
+            expectedTokenValue
+        );
         require(_resp, "token transfer to escrow failed, try again");
 
         (bool payResponse, uint payRef) = escrowInterface.payForItemsWithERC20(
@@ -376,9 +472,12 @@ contract Ecommerce is Ecommercev1 {
     function getTokenEquivalence(
         uint _totalBill,
         string memory _paymentToken
-    ) public returns (uint256) {
-        (uint256 _tokenVal, bytes memory _callData) = _getTokenEquivalence(_totalBill, _paymentToken);
-        return _tokenVal;
+    ) public returns (uint256, bytes memory) {
+        (uint256 _tokenVal, bytes memory _callData) = _getTokenEquivalence(
+            _totalBill,
+            _paymentToken
+        );
+        return (_tokenVal, _callData);
     }
 
     function _getTokenEquivalence(
@@ -413,10 +512,11 @@ contract Ecommerce is Ecommercev1 {
         ) = priceFeed.latestRoundData();
 
         uint8 feedDecimals = priceFeed.decimals();
+        require(tokenPrice > 0, "invalid token price from price feed");
 
         if (keccak256(bytes(_paymentToken)) == keccak256(bytes("ETH"))) {
             (uint256 _ethVal, bytes memory _callData) = Utils
-                ._getEthEquivalence(
+                .getEthEquivalence(
                     _totalBill,
                     feedDecimals,
                     USD_DECIMALS,
@@ -425,7 +525,7 @@ contract Ecommerce is Ecommercev1 {
             return (_ethVal, _callData);
         } else {
             (uint256 _tokenVal, bytes memory _callData) = Utils
-                ._getTokenEquivalence(
+                .getTokenEquivalence(
                     _totalBill,
                     _paymentToken,
                     escrowInterface

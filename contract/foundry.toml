@@ -4,6 +4,9 @@ out = "out"
 src = "src"
 via-ir = true
 
+# [profile.default]
+ignored = ["test/recon"]
+
 # remappings = [
 #   "@chainlink/=lib/chainlink/contracts/src/v0.8/interfaces/",
 #   "@openzeppelin/contracts-default/=lib/openzeppelin-contracts/contracts/",

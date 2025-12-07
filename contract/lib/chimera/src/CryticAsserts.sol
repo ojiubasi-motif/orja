@@ -70,4 +70,5 @@ contract CryticAsserts is Asserts {
     function precondition(bool p) internal virtual override {
         require(p);
     }
+    
 }

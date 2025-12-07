@@ -2,34 +2,15 @@
 pragma solidity ^0.8.0;
 
 import "@chainlink/AggregatorV3Interface.sol";
-import {Product, OrderItem} from "../Common.sol";
+import {Product, OrderItem} from "@src/Common.sol";
 import "forge-std/console.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {IProduct as ProductContract} from "../interfaces/IEcomm.sol";
+import {IProduct as ProductContract} from "@custom-interfaces/IEcomm.sol";
 
 library Utils {
-    // function _calculateTotalBill(
-    //     ProductContract productMngr, // pass the contract reference
-    //     OrderItem[] memory _order
-    // ) internal returns (uint256) {
-    //     Product memory productData;
-    //     uint256 cumm = 0;
-    //     for (uint256 i = 0; i < _order.length; ++i) {
-    //         productData = productMngr.getProductData(_order[i].productId);
-    //         if (productData.productId == 0) {
-    //             continue; // skip if product is not valid
-    //         }
-    //         if (productData.sellerId == 0) {
-    //             continue; // skip if product seller is not valid
-    //         }
-    //         // int8 quantity = userToproductQtyInCart[userData.userId][productId];
-    //         cumm += (productData.unitPrice * _order[i].qty);
-    //     }
-    //     return cumm;
-    // }
     
-    function previewCheckoutBill(OrderItem[] memory _order) public pure returns (uint256) {
+    function previewCheckoutBill(OrderItem[] memory _order) external pure returns (uint256) {
         // Product memory productData;
         uint256 cumm = 0;
         for (uint256 i = 0; i < _order.length; ++i) {
@@ -50,11 +31,11 @@ library Utils {
         return cumm;
     }
 
-    function _scaleToPrecision(
+    function scaleToPrecision(
         int256 _value,
         uint8 _defaultDecimals,
         uint8 _desiredDecimals
-    ) internal pure returns (int256) {
+    ) public pure returns (int256) {
         if (_defaultDecimals < _desiredDecimals) {
             (bool success, uint256 scaledValue) = Math.tryMul(
                 uint256(_value),
@@ -73,15 +54,16 @@ library Utils {
         return _value; //if _desiredDecimals == _defaultDecimals
     }
 
-    function _generateProductId(
+    function generateProductId(
+        uint256 _refCounter,
         string calldata _productTitle,
         address _listedBy
-    ) internal view returns (uint64 id) {
+    ) external view returns (uint64 id) {
         // uint256 id;
         id = uint64(
             uint256(
                 keccak256(
-                    abi.encodePacked(_productTitle, _listedBy, block.timestamp)
+                    abi.encodePacked(_refCounter, _productTitle, _listedBy, block.timestamp)
                 )
             )
         );
@@ -89,12 +71,12 @@ library Utils {
     }
 
     // function checkUserBill()
-    function _getEthEquivalence(
+    function getEthEquivalence(
         uint _totalBill,
         uint8 _feedDecimals,
         uint8 _defaultDecimals,
         uint256 _tokenPrice
-    ) internal pure returns (uint256, bytes memory) {
+    ) external pure returns (uint256, bytes memory) {
         require(_tokenPrice > 0, "Invalid price fetched from feed");
         require(
             _feedDecimals > 0,
@@ -103,7 +85,7 @@ library Utils {
 
         int feedAnswer = _feedDecimals == _defaultDecimals
             ? int(_tokenPrice)
-            : _scaleToPrecision(
+            : scaleToPrecision(
                 int(_tokenPrice),
                 _feedDecimals,
                 _defaultDecimals
@@ -124,14 +106,14 @@ library Utils {
         // return ((_totalBill * 1e18) / uint256(feedAnswer), feedData); //return the equivalent amount of eth in wei
     }
 
-    function _getTokenEquivalence(
+    function getTokenEquivalence(
         uint _totalBill,
         string memory _tokenSymbol,
         address tokenAddr,
         uint8 _feedDecimals,
         uint8 _defaultDecimals,
         uint256 _tokenPrice
-    ) internal returns (uint256, bytes memory) {
+    ) external returns (uint256, bytes memory) {
         require(_tokenPrice > 0, "Invalid price fetched from feed");
         require(
             _feedDecimals > 0,
@@ -151,7 +133,7 @@ library Utils {
         // @dev ensure protocol precision(USD_PRECISION) is same with the pricefeed precision(10**8 for usd)
         int feedAnswer = _feedDecimals == _defaultDecimals
             ? int(_tokenPrice)
-            : _scaleToPrecision(
+            : scaleToPrecision(
                 int(_tokenPrice),
                 _feedDecimals,
                 _defaultDecimals
@@ -172,6 +154,23 @@ library Utils {
         return (Math.ceilDiv(scaledTotalBill, uint256(feedAnswer)), feedData); //return the equivalent amount of token in its smallest unit
         // }
     }
+
+    function confirmValueSent(uint256 _bill, uint _valueSent, bytes memory _feedData) external pure returns(string memory symbol, int256 _price){
+        (string memory _symbol, uint8 _decimal, int256 _tokenPrice) = abi
+            .decode(_feedData, (string, uint8, int256));
+        require(_tokenPrice > 0, "Invalid price fetched from feed");
+
+        (bool success, uint256 _ethVal) = Math.tryMul(
+            _valueSent,
+            uint(_tokenPrice)
+        );
+        require(success, "escrow overflow calculating eth value in usd");
+        uint EthvalueInUsd = Math.ceilDiv(_ethVal, 1e18); // Assuming pricefeed returns price in 8 decimals
+        // console.log("EthvalueInUsd==>", EthvalueInUsd);
+        // console.log("_bill==>", _bill);
+        require(EthvalueInUsd >= _bill, "Insufficient ETH sent for payment");
+        return (_symbol, _tokenPrice);
+    }
 }
 
 library ProductsUtils {
@@ -180,25 +179,23 @@ library ProductsUtils {
         uint _start,
         uint _end
     ) internal pure returns (Product[] memory) {
-        // require(_end < _products.length, "End index out of bounds");
+        // require(_end < _products.length, "_end index is out of bounds");
         require(
             _start <= _end && _end - _start <= 100,
-            "Invalid range and/or range shouldn't be bigger than 100"
+            "you cannot fetch more than 100 products at once, and  start must not be greater than end"
         );
-        //  require(_end < products.length, "End index out of bounds");
-        // require(
-        //     _start <= _end && _end - _start <= 100,
-        //     "Invalid range and/or range shouldn't be bigger than 100"
-        // )
+        uint256 _lastIndex = _end > _products.length - 1 ? _products.length - 1 : _end;
+        uint256 _startIndex = _start > _lastIndex ? _lastIndex : _start;
         if(_products.length <= 100){
-            _end = _products.length - 1;
+            _lastIndex = _products.length - 1;
+            _startIndex = _startIndex <= _lastIndex ? _startIndex : _lastIndex;
         }
         Product[] memory fetchedProducts = new Product[](
-            _start == _end ? 1 : (_end - _start) + 1
+            _startIndex == _lastIndex ? 1 : (_lastIndex - _startIndex) + 1
         );
 
         for (uint i = 0; i < fetchedProducts.length; i++) {
-            fetchedProducts[i] = _products[i + _start];
+            fetchedProducts[i] = _products[i + _startIndex];
         }
 
         return fetchedProducts;

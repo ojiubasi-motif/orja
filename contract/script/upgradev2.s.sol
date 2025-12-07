@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.24;
 
 import "forge-std/Script.sol";
@@ -104,7 +104,6 @@ contract DeployUUPS is Script {
         console.log("product Impl:", address(productsImpl));
         console.log("Ecommerce Impl:", address(ecommerceImpl));
         console.log("Escrow Impl:", address(escrowImpl));
-
         console.log("User Manager proxy:", address(userProxy));
         console.log("product proxy:", address(productProxy));
         console.log("Ecommerce Proxy:", address(ecommerceProxy));

@@ -1,6 +1,8 @@
 {
     "recon.foundryConfigPath": "contract/foundry.toml",
-    "recon.defaultFuzzer": "echidna",
+    "recon.defaultFuzzer": "Medusa",
     "recon.showAllFiles": true,
-    "recon.echidna.testLimit": 50000
+    "recon.echidna.testLimit": 1000000,
+    "recon.echidna.mode": "exploration",
+    "recon.medusa.testLimit": 1000000
 }

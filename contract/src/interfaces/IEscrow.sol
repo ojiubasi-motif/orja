@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity >=0.8.26;
 
-import {Token} from "../Common.sol";
+import {Token} from "@src/Common.sol";
 
 interface IEcomEscrow  {
     function payForItemsWithETH(uint _userId,uint _bill, bytes memory _feedData, uint _payRef) external payable returns (bool, uint);

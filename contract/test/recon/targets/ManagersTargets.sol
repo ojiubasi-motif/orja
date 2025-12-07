@@ -20,9 +20,7 @@ abstract contract ManagersTargets is
     
     /// @dev Start acting as another actor
     function switchActor(uint256 entropy) public {
-        address[] memory _allActors = _getActors();//user::get the full list of actors
-        uint256 _seed = between(entropy,0,_allActors.length-1);//user-defined::clamp the entropy to avoid unproductivity and reverts
-        _switchActor(_seed);
+        _switchActor(entropy);
     }
 
 
